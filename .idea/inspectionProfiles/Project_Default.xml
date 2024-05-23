@@ -1,0 +1,80 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <Languages>
+        <language minSize="1382" name="Python" />
+      </Languages>
+    </inspection_tool>
+    <inspection_tool class="PyCompatibilityInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ourVersions">
+        <value>
+          <list size="4">
+            <item index="0" class="java.lang.String" itemvalue="3.9" />
+            <item index="1" class="java.lang.String" itemvalue="3.10" />
+            <item index="2" class="java.lang.String" itemvalue="3.11" />
+            <item index="3" class="java.lang.String" itemvalue="3.12" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="13">
+            <item index="0" class="java.lang.String" itemvalue="scipy" />
+            <item index="1" class="java.lang.String" itemvalue="discovery-transition-ds" />
+            <item index="2" class="java.lang.String" itemvalue="botocore" />
+            <item index="3" class="java.lang.String" itemvalue="scikit-learn" />
+            <item index="4" class="java.lang.String" itemvalue="numpy" />
+            <item index="5" class="java.lang.String" itemvalue="aistac-foundation" />
+            <item index="6" class="java.lang.String" itemvalue="pandas" />
+            <item index="7" class="java.lang.String" itemvalue="fsspec" />
+            <item index="8" class="java.lang.String" itemvalue="pyyaml" />
+            <item index="9" class="java.lang.String" itemvalue="boto3" />
+            <item index="10" class="java.lang.String" itemvalue="seaborn" />
+            <item index="11" class="java.lang.String" itemvalue="matplotlib" />
+            <item index="12" class="java.lang.String" itemvalue="s3fs" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyPep8Inspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
+    <inspection_tool class="PyPep8NamingInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <option name="ignoredErrors">
+        <list>
+          <option value="N806" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyTypeCheckerInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="aistac.properties.abstract_properties.AbstractProperty.contract_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.connectors_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.description_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.status_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.version_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.run_book_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.intent_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.knowledge" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.snapshot_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.snapshot_value" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.knowledge_key" />
+          <option value="aistac.properties.abstract_properties.AbstractProperty.meta" />
+          <option value="aistac.components.aistac_commons.DataAnalytics.patterns" />
+          <option value="aistac.components.aistac_commons.DataAnalytics.params" />
+          <option value="aistac.components.aistac_commons.DataAnalytics.stats" />
+          <option value="aistac.components.aistac_commons.DataAnalytics.intent" />
+          <option value="object.__add__" />
+          <option value="list.str" />
+          <option value="pyarrow.compute.*" />
+          <option value="ds_core.properties.abstract_properties.AbstractProperty.*" />
+          <option value="list.*" />
+          <option value="pandas.core.indexes.datetimes.DatetimeIndex.normalize" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

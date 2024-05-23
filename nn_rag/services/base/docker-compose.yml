@@ -1,0 +1,16 @@
+version: '3.9'
+
+x-common-variables: &common-variables
+    HADRON_DOMAIN_REPO_PATH: https://raw.githubusercontent.com/project-hadron/hadron-asset-bank/blob/master/...
+    HADRON_DEFAULT_PATH: /data/cache/data
+
+services:
+  domain-controller:
+    image: gigas64/hadron_pyarrow:1.5
+    env_file: credential_env
+    environment:
+      <<: *common-variables
+      HADRON_CONTROLLER_REPORT: ./cache
+      HADRON_DEFAULT_PATH: /cache
+    volumes:
+      - ./cache:/tmp/cache
