@@ -1,0 +1,21 @@
+version: '3.9'
+
+x-common-variables: &common-variables
+    HADRON_DOMAIN_REPO_PATH: https://raw.githubusercontent.com/project-hadron/neural_rag/main/jupyter/knowledge/hadron/contracts/
+
+services:
+  domain-controller:
+    image: gigas64/hadron_neural:0.1
+    env_file: credential_env
+    environment:
+      <<: *common-variables
+      HADRON_KNOWLEDGE_SOURCE_URI: https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf
+      HADRON_KNOWLEDGE_PERSIST_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/eu_ai_act_2024.parquet
+      HADRON_PROFILE_NAME: EU_AI_Act_2024
+      # parameters (optional)
+      HADRON_NUM_SENTENCE_CHUNK_SIZE: 10
+      HADRON_EMBEDDING_BATCH_SIZE: 32
+      HADRON_EMBEDDING_MODEL_NAME: all-mpnet-docker-v2
+      HADRON_EMBEDDING_DEVICE: cpu
+    volumes:
+      - ./cache:/tmp/cache

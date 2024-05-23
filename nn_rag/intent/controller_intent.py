@@ -26,7 +26,7 @@ class ControllerIntentModel(AbstractIntentModel):
         """
         default_save_intent = default_save_intent if isinstance(default_save_intent, bool) else True
         default_replace_intent = default_replace_intent if isinstance(default_replace_intent, bool) else True
-        default_intent_level = default_intent_level if isinstance(default_intent_level, (str, int, float)) else 'base'
+        default_intent_level = default_intent_level if isinstance(default_intent_level, (str, int, float)) else 'docker'
         default_intent_order = -1 if isinstance(order_next_available, bool) and order_next_available else 0
         intent_param_exclude = ['canonical']
         intent_type_additions = []
@@ -37,7 +37,7 @@ class ControllerIntentModel(AbstractIntentModel):
 
     def run_intent_pipeline(self, run_level: str, source: str=None, persist: [str, list]=None,
                             controller_repo: str=None, **kwargs):
-        """ Collectively runs all parameterised intent taken from the property manager against the code base as
+        """ Collectively runs all parameterised intent taken from the property manager against the code docker as
         defined by the intent_contract.
 
         It is expected that all intent methods have the 'canonical' as the first parameter of the method signature

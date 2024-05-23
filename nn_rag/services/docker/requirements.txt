@@ -1,7 +1,6 @@
 setuptools
 # Hadron foundation
 discovery-core
-discovery-capability
 # Structure packages
 pyarrow
 requests
@@ -9,16 +8,11 @@ requests
 pandas
 numpy
 scikit-learn
-matplotlib
-seaborn
 scipy
-# Database
-duckdb
-boto3
-botocore
-fsspec
-s3fs
-pymysql
-sqlalchemy
-pymongo
-psycopg2-binary
+PyMuPDF
+sentence_transformers
+spacy
+transformers
+accelerate
+bitsandbytes
+

@@ -31,12 +31,13 @@ def run_hadron_controller():
 
 def set_env_from_payload_if_available():
     payload = {
-             "hadron_kwargs":{
-                "HADRON_DOMAIN_REPO_PATH": "https://raw.githubusercontent.com/project-hadron/",
-                "HADRON_SOURCE_URI": "",
-                "HADRON_PERSIST_URI": "./cache/",
-            }
+        "hadron_kwargs":{
+            "HADRON_DOMAIN_REPO_PATH": "https://raw.githubusercontent.com/project-hadron/neural_rag/main/jupyter/knowledge/hadron/contracts/",
+            "HADRON_KNOWLEDGE_SOURCE_URI": "https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf",
+            "HADRON_KNOWLEDGE_PERSIST_URI": "./cache/",
+            "HADRON_PROFILE_NAME": "EU_AI_Act_2024",
         }
+    }
 
     # extract any extra kwargs
     hadron_kwargs = payload.get('hadron_kwargs', {})

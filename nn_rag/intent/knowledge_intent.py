@@ -242,7 +242,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         batch_size = self._extract_value(batch_size)
         batch_size = batch_size if isinstance(batch_size, int) else 32
         embedding_name = self._extract_value(embedding_name)
-        embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-base-v2'
+        embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-docker-v2'
         device = self._extract_value(device)
         device = device if isinstance(device, str) else 'cpu'
         pages_and_chunks = canonical.to_pylist()

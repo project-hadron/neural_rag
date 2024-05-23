@@ -47,7 +47,7 @@ class AbstractKnowledgeIntentModel(AbstractIntentModel):
 
     def run_intent_pipeline(self, canonical: pa.Table=None, intent_level: [str, int]=None, seed: int=None,
                             simulate: bool=None, **kwargs) -> pa.Table:
-        """Collectively runs all parameterised intent taken from the property manager against the code base as
+        """Collectively runs all parameterised intent taken from the property manager against the code docker as
         defined by the intent_contract. The whole run can be seeded though any parameterised seeding in the intent
         contracts will take precedence
 
