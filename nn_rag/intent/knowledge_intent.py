@@ -167,7 +167,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                   'sentence_num': num,
                                   "char_count": len(s),
                                   "word_count": len(s.split(" ")),
-                                  "token_count": len(s) / 4,  # 1 token = ~4 chars, see:
+                                  "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                                   })
         if len(to_drop) > 0:
             drop_list = []
@@ -247,7 +247,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 chunk_dict["chunk_sentence_count"] = num_sentence_chunk_size
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
                 chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
-                chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4  # 1 token = ~4 chars
+                chunk_dict["chunk_token_count"] = round(len(joined_sentence_chunk) / 4)  # 1 token = ~4 chars
 
                 pages_and_chunks.append(chunk_dict)
         return pa.Table.from_pylist(pages_and_chunks)
