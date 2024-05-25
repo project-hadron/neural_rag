@@ -1,6 +1,5 @@
 import inspect
 import re
-import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -113,16 +112,22 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_profiler(self, canonical: pa.Table, profile_name: str, header: str=None, num_sentence_chunk_size: int=None, seed: int=None,
-                      save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                      replace_intent: bool=None, remove_duplicates: bool=None):
-        """ Taking a Table with a text column, returning the profile of that text including sentence text ready for
-        sentence chunking.
+    def text_profiler(self, canonical: pa.Table, as_text: bool=None, header: str=None, num_sentence_chunk_size: int=None,
+                      to_drop:list=None, seed: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                      intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Taking a Table with a text column, returning the profile of that text as a list of sentences
+        that can be interrogated and the selective sentence numbers removed. By default this returns the text
+        profile as a set of sentences with accompanying statistics to enable discovery. It can also be set to return
+        a text column where the to_drop list has been applied, and thus part of a pipeline.
+
+        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start add stop
+        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
 
         :param canonical: a Table with a text column
-        :param profile_name: The label name for the profile
+        :param as_text: (optional) If this should return a text column or a full profile for discovered.
         :param header: (optional) The name of the target text column, default 'text'
         :param num_sentence_chunk_size: (optional) the number of sentences to chunk, default is 10
+        :param to_drop: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -147,32 +152,57 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = header if isinstance(header, str) else 'text'
         num_sentence_chunk_size = self._extract_value(num_sentence_chunk_size)
         num_sentence_chunk_size = num_sentence_chunk_size if isinstance(num_sentence_chunk_size, int) else 10
+
+        to_drop = Commons.list_formatter(to_drop)
         _seed = seed if isinstance(seed, int) else self._seed()
         nlp = English()
         nlp.add_pipe("sentencizer")
-        pages_and_texts = []
-        for page_number, item in enumerate(canonical.to_pylist()):
-            item['profile_name'] = profile_name
-            item['page_number'] = page_number
-            item['char_count'] = len(item[header])
-            item['word_count'] = len(item[header].split(" "))
-            item['sentence_count_raw'] = len(item[header].split(". "))
-            item['token_count'] = len(item[header]) / 4  # 1 token = ~4 chars, see:
-            item["sentences"] = list(nlp(item[header]).sents)
-            # Make sure all sentences are strings
-            item["sentences"] = [str(sentence) for sentence in item["sentences"]]
-            # split sentences into chunks
-            item["sentence_chunks"] = [item["sentences"][i:i + num_sentence_chunk_size] for i in range(0, len(item["sentences"]), num_sentence_chunk_size)]
-            item["num_chunks"] = len(item["sentence_chunks"])
-            pages_and_texts.append(item)
-        return pa.Table.from_pylist(pages_and_texts)
+        text = canonical.to_pylist()
+        sentences = []
+        for item in text:
+            sents = list(nlp(item[header]).sents)
+            sents = [str(sentence) for sentence in sents]
+            for num, s in enumerate(sents):
+                sentences.append({'sentence': s,
+                                  'sentence_num': num,
+                                  "char_count": len(s),
+                                  "word_count": len(s.split(" ")),
+                                  "token_count": len(s) / 4,  # 1 token = ~4 chars, see:
+                                  })
+        if len(to_drop) > 0:
+            drop_list = []
+            for x in to_drop:
+                if isinstance(x, tuple):
+                    drop_list += (list(range(x[0], x[1])))
+                else:
+                    drop_list += [x]
+            drop_list.sort()
+            df = pd.DataFrame(sentences)
+            df = df.drop(index=drop_list)
+            sentences = df.to_dict(orient='records')
+        if as_text:
+            text = ''
+            for idx in range(len(sentences)):
+                text += sentences[idx]['sentence'] + ' '
+            arr = pa.array([text.strip()], pa.string())
+            return pa.table([arr], names=['text'])
+        return pa.Table.from_pylist(sentences)
 
-    def sentence_chunk(self, canonical: pa.Table, seed: int=None, save_intent: bool=None,
-                       intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                       remove_duplicates: bool=None):
-        """ Taking a text profile, converts sentences into chunks ready to be embedded.
+
+    def text_chunk(self, canonical: pa.Table, text_name: str, header: str=None, num_sentence_chunk_size: int=None,
+                   seed: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                   replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Taking a Table with a text column, converts the text into chunks ready for embedding.
+
+        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start and stop
+        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]. These values
+        can be identified from the text_profiling as part of discovery.
 
         :param canonical: a text profile Table
+        :param text_name: a reference name for this text
+        :param header: (optional) The name of the text column in the Table. Default is 'text'
+        :param num_sentence_chunk_size: (optional) The number of sentences in each chunk. Default is 10
+        :param to_drop: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -193,19 +223,32 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
+        header = header if isinstance(header, str) else 'text'
+        num_sentence_chunk_size = num_sentence_chunk_size if isinstance(num_sentence_chunk_size, int) else 10
         _seed = seed if isinstance(seed, int) else self._seed()
+        nlp = English()
+        nlp.add_pipe("sentencizer")
+        text = canonical.to_pylist()
         pages_and_chunks = []
-        for item in canonical.to_pylist():
-            for sentence_chunk in item["sentence_chunks"]:
-                chunk_dict = {"page_number": item["page_number"]}
-                # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
+        for item in text:
+            item["sentences"] = list(nlp(item[header]).sents)
+            # Make sure all sentences are strings
+            item["sentences"] = [str(sentence) for sentence in item["sentences"]]
+            item["sentence_chunks"] = [item["sentences"][i:i + num_sentence_chunk_size] for i in
+                                       range(0, len(item["sentences"]), num_sentence_chunk_size)]
+            for count, sentence_chunk in enumerate(item["sentence_chunks"]):
+                chunk_dict = {"text_name": text_name, "chunk_number": count}
+                # Join the sentences together into a paragraph-like structure, aka join the list of sentences into one paragraph
                 joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
-                joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
-                chunk_dict["sentence_chunk"] = joined_sentence_chunk
-                # Get stats about the chunk
+                joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1',
+                                               joined_sentence_chunk)  # ".A" => ". A" (will work for any captial letter)
+                chunk_dict["sentence_chunks"] = joined_sentence_chunk
+                # Get some stats on our chunks
+                chunk_dict["chunk_sentence_count"] = num_sentence_chunk_size
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
                 chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
-                chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4  # 1 token = ~4 characters
+                chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4  # 1 token = ~4 chars
+
                 pages_and_chunks.append(chunk_dict)
         return pa.Table.from_pylist(pages_and_chunks)
 

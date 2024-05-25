@@ -59,7 +59,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_chunk(self):
+    def test_text(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -72,14 +72,17 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
                 'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
                 'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr1 = pa.array([1], type=pa.int64())
-        arr2 = pa.array([text], pa.string())
-        tbl = pa.table([arr1, arr2], names=['page_number', 'text'])
-        text_chunks = tools.text_profiler(tbl)
-        len(text_chunks)
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_profiler(tbl)
+        self.assertEqual(result.shape, (30, 5))
+        result = tools.text_profiler(tbl, to_drop=[0, 2,(8,10)])
+        self.assertEqual(result.shape, (26, 5))
+        result = tools.text_profiler(tbl, as_text=True)
+        self.assertEqual(result.shape, (1,1))
 
 
-    def test_splitting(self):
+    def test_text_chunk(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
@@ -95,16 +98,13 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
                 'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
                 'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr1 = pa.array([1], type=pa.int64())
-        arr2 = pa.array([text], pa.string())
-        tbl = pa.table([arr1, arr2], names=['page_number', 'text'])
-        text_chunks = tools.text_profiler(tbl, header='text', num_sentence_chunk_size=3)
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
         # chunks
-        chunks = tools.sentence_chunk(text_chunks, 'sentence_chunks')
-        embedding = tools.chunk_embedding(chunks)
-        print(embedding.shape)
+        result = tools.text_chunk(tbl, text_name='Test Text')
+        self.assertEqual(result.shape, (3,7))
+        print(result.column_names)
 
-        # tensor = torch.from_numpy(pa_tensor.to_numpy)
 
     def test_raise(self):
         startTime = datetime.now()
