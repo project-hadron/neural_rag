@@ -242,7 +242,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
                 joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1',
                                                joined_sentence_chunk)  # ".A" => ". A" (will work for any captial letter)
-                chunk_dict["sentence_chunks"] = joined_sentence_chunk
+                chunk_dict["sentence_chunk"] = joined_sentence_chunk
                 # Get some stats on our chunks
                 chunk_dict["chunk_sentence_count"] = num_sentence_chunk_size
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
