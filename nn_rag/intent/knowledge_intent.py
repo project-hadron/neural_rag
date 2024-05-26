@@ -17,8 +17,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                             seed: int=None, save_intent: bool=None, intent_order: int=None,
                             intent_level: [int, str]=None, replace_intent: bool=None,
                             remove_duplicates: bool=None) -> pa.Table:
-        """ correlates a named header to other header where the condition is met and replaces the header column
-        value with a constant or value at the same index of an array.
+        """ Takes the column name header from the canonical and applies the condition. Where the condition
+        is satisfied within the column, the canonical row is removed.
 
         The selection is a list of triple tuples in the form: [(comparison, operation, logic)] where comparison
         is the item or column to compare, the operation is what to do when comparing and the logic if you are
@@ -35,7 +35,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a pa.Table as the reference table
         :param header: the header for the target values to change
-        :param condition: a tuple or tuples of
+        :param condition: a list of tuple or tuples in the form [(comparison, operation, logic)]
         :param mask_null: (optional) if nulls in the other they require a value representation.
         :param seed: (optional) the random seed. defaults to current datetime
         :param save_intent: (optional) if the intent contract should be saved to the property manager
@@ -68,7 +68,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                         max_replacements: int=None, seed: int=None, to_header: str=None, save_intent: bool=None,
                         intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
                         remove_duplicates: bool=None):
-        """ For each string in target, replace non-overlapping substrings that match the given literal pattern
+        """ For each string in header, replace non-overlapping substrings that match the given literal pattern
         with the given replacement. If max_replacements is given and not equal to -1, it limits the maximum
         amount replacements per input, counted from the left. Null values emit null.
 
@@ -123,12 +123,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                       intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
                       remove_duplicates: bool=None):
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences
-        that can be interrogated and the selective sentence numbers removed. By default this returns the text
-        profile as a set of sentences with accompanying statistics to enable discovery. It can also be set to return
-        a text column where the to_drop list has been applied, and thus part of a pipeline.
-
-        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start add stop
-        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
+        with accompanying statistics to enable discovery.
 
         :param canonical: a Table with a text column
         :param header: (optional) The name of the target text column, default 'text'
@@ -174,11 +169,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None, seed: int=None,
                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                         replace_intent: bool=None, remove_duplicates: bool=None):
-        """ Taking a Table with a text column, converts the text into chunks ready for embedding.
-
-        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start and stop
-        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]. These values
-        can be identified from the text_profiling as part of discovery.
+        """ Taking a profile Table and converts the sentences into chunks ready for embedding.
 
         :param canonical: a text profile Table
         :param num_sentence_chunk_size: (optional) The number of sentences in each chunk. Default is 10
@@ -225,7 +216,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     def chunk_embedding(self, canonical: pa.Table, batch_size: int=None, embedding_name: str=None, device: str=None,
                         seed: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                         replace_intent: bool=None, remove_duplicates: bool=None):
-        """ takes sentence chunks from a Table and converts them to a pyarrow tensor.
+        """ takes chunks from a Table and converts them to a pyarrow tensor of embeddings.
 
          :param canonical: sentence chunks to be embedded
          :param batch_size: (optional) the size of the embedding batches
@@ -261,6 +252,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         pages_and_chunks = canonical.to_pylist()
         embedding_model = SentenceTransformer(model_name_or_path=embedding_name, device=device)
         # Turn text chunks into a single list
-        text_chunks = [item["sentence_chunk"] for item in pages_and_chunks]
+        text_chunks = [item["chunk_text"] for item in pages_and_chunks]
         numpy_embedding = embedding_model.encode(text_chunks, batch_size=batch_size, convert_to_numpy=True)
         return pa.Tensor.from_numpy(numpy_embedding)
