@@ -76,10 +76,6 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_profiler(tbl)
         self.assertEqual(result.shape, (30, 5))
-        result = tools.text_profiler(tbl, to_drop=[0, 2] + list(range(8,10)))
-        self.assertEqual(result.shape, (26, 5))
-        result = tools.text_profiler(tbl, as_text=True)
-        self.assertEqual(result.shape, (1,1))
 
     def test_profiling(self):
         kn = Knowledge.from_env('tester', has_contract=False)
@@ -96,7 +92,9 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_profiler(tbl, to_drop=[0, 2] + list(range(4,6)))
+        sentences = tools.text_profiler(tbl)
+        result = kn.tools.filter_on_condition(sentences, header='word_count', condition=(1, 'greater', None))
+
 
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
