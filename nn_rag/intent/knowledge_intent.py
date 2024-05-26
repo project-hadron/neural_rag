@@ -62,7 +62,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         seed = seed if isinstance(seed, int) else self._seed()
         h_col = canonical.column(header).combine_chunks()
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
-        return canonical.filter(canonical.column(mask))
+        return canonical.filter(mask)
 
     def pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
                         max_replacements: int=None, seed: int=None, to_header: str=None, save_intent: bool=None,
