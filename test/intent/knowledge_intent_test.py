@@ -76,11 +76,27 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_profiler(tbl)
         self.assertEqual(result.shape, (30, 5))
-        result = tools.text_profiler(tbl, to_drop=[0, 2,(8,10)])
+        result = tools.text_profiler(tbl, to_drop=[0, 2] + list(range(8,10)))
         self.assertEqual(result.shape, (26, 5))
         result = tools.text_profiler(tbl, as_text=True)
         self.assertEqual(result.shape, (1,1))
 
+    def test_profiling(self):
+        kn = Knowledge.from_env('tester', has_contract=False)
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_profiler(tbl, to_drop=[0, 2] + list(range(4,6)))
 
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
@@ -101,7 +117,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         # chunks
-        result = tools.text_chunk(tbl, text_name='Test Text')
+        result = tools.sentence_chunks(tbl, text_name='Test Text')
         self.assertEqual(result.shape, (3,7))
         print(result.column_names)
 
