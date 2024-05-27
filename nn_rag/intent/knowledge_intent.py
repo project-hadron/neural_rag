@@ -287,7 +287,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         query = self._extract_value(query)
         _seed = seed if isinstance(seed, int) else self._seed()
         topk = self._extract_value(topk)
-        topk = topk if isinstance(topk, int) else 32
+        topk = topk if isinstance(topk, int) else 5
         embedding_name = self._extract_value(embedding_name)
         embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-docker-v2'
         device = self._extract_value(device)
