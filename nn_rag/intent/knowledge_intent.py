@@ -1,5 +1,6 @@
 import inspect
 import torch
+import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 from spacy.lang.en import English
@@ -118,14 +119,18 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_profiler(self, canonical: pa.Table, header: str=None, seed: int=None, save_intent: bool=None,
-                      intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                      remove_duplicates: bool=None):
-        """ Taking a Table with a text column, returning the profile of that text as a list of sentences
-        with accompanying statistics to enable discovery.
+    def text_profiler(self, canonical: pa.Table, header: str=None, to_drop:list=None, seed: int=None,
+                      save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                      replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
+        accompanying statistics to enable discovery.
+
+        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start add stop
+        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
 
         :param canonical: a Table with a text column
         :param header: (optional) The name of the target text column, default 'text'
+        :param to_drop: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -148,6 +153,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
+        to_drop = Commons.list_formatter(to_drop)
         _seed = seed if isinstance(seed, int) else self._seed()
         nlp = English()
         nlp.add_pipe("sentencizer")
@@ -163,6 +169,17 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                   "word_count": len(s.split(" ")),
                                   "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                                   })
+        if len(to_drop > 0):
+            drop_list = []
+            for x in to_drop:
+                if isinstance(x, tuple):
+                    drop_list += (list(range(x[0], x[1])))
+                else:
+                    drop_list += [x]
+            drop_list.sort()
+            df = pd.DataFrame(sentences)
+            df.drop(index=drop_list)
+            return pa.Table.from_pandas(df)
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None, seed: int=None,
