@@ -64,6 +64,52 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
+    def sentence_removal(self, canonical: pa.Table, indices:list=None, seed: int=None, to_header: str=None,
+                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                         replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Taking a canonical of sentences from the text_profiler method or allows the given sentence indices
+        to be removed.
+
+        'indices' takes a list of either sentence_num, representing the sentence to be removed, or a tuple of start add stop
+        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
+
+
+        :param canonical: a Table of sentences and stats
+        :param indices: (optional) a list of numbers and/or tuples for sentences to be dropped
+        :param to_header: (optional) an optional name to call the column
+        :param seed: (optional) a seed value for the random function: default to None
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent persist options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # remove intent params
+        canonical = self._get_canonical(canonical)
+        indices = Commons.list_formatter(indices)
+        _seed = seed if isinstance(seed, int) else self._seed()
+        drop_list = []
+        for x in indices:
+            if isinstance(x, tuple):
+                drop_list += (list(range(x[0], x[1])))
+            else:
+                drop_list += [x]
+        df = pd.DataFrame(canonical)
+        df.drop(index=drop_list)
+        return pa.Table.from_pandas(df)
+
+
     def pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
                         max_replacements: int=None, seed: int=None, to_header: str=None, save_intent: bool=None,
                         intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
@@ -119,18 +165,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_profiler(self, canonical: pa.Table, header: str=None, to_drop:list=None, seed: int=None,
+    def text_profiler(self, canonical: pa.Table, header: str=None, seed: int=None,
                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                       replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
         accompanying statistics to enable discovery.
 
-        to_drop takes a list of either integers, representing the sentence to be removed, or a tuple of start add stop
-        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
-
         :param canonical: a Table with a text column
         :param header: (optional) The name of the target text column, default 'text'
-        :param to_drop: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -153,7 +195,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
-        to_drop = Commons.list_formatter(to_drop)
         _seed = seed if isinstance(seed, int) else self._seed()
         nlp = English()
         nlp.add_pipe("sentencizer")
@@ -169,17 +210,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                   "word_count": len(s.split(" ")),
                                   "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                                   })
-        if len(to_drop > 0):
-            drop_list = []
-            for x in to_drop:
-                if isinstance(x, tuple):
-                    drop_list += (list(range(x[0], x[1])))
-                else:
-                    drop_list += [x]
-            drop_list.sort()
-            df = pd.DataFrame(sentences)
-            df.drop(index=drop_list)
-            return pa.Table.from_pandas(df)
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None, seed: int=None,
