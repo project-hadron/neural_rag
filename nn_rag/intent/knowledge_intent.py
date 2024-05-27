@@ -107,7 +107,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             else:
                 drop_list += [x]
         df = pd.DataFrame(sentences)
-        df.drop(index=drop_list)
+        df = df.drop(index=drop_list)
         return pa.Table.from_pandas(df)
 
 

@@ -93,9 +93,9 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl)
-        result = kn.tools.filter_on_condition(sentences, header='word_count', condition=(1, 'greater', None))
-        kn2 = Knowledge.from_env('tester')
-        print(kn2.report_intent().to_string())
+        result = tools.sentence_removal(sentences, indices=[0])
+        print(kn.table_report(result, head=3).to_string())
+        
 
 
     def test_text_chunk(self):
