@@ -94,6 +94,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl)
         result = kn.tools.filter_on_condition(sentences, header='word_count', condition=(1, 'greater', None))
+        kn2 = Knowledge.from_env('tester')
+        print(kn2.report_intent().to_string())
 
 
     def test_text_chunk(self):
@@ -115,7 +117,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         # chunks
-        result = tools.sentence_chunks(tbl, text_name='Test Text')
+        result = tools.sentence_chunks(tbl)
         self.assertEqual(result.shape, (3,7))
         print(result.column_names)
 

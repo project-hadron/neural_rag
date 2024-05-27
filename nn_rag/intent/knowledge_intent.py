@@ -1,10 +1,9 @@
 import inspect
-import re
-import pandas as pd
+import torch
 import pyarrow as pa
 import pyarrow.compute as pc
 from spacy.lang.en import English
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import util, SentenceTransformer
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 
@@ -249,9 +248,53 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-docker-v2'
         device = self._extract_value(device)
         device = device if isinstance(device, str) else 'cpu'
-        pages_and_chunks = canonical.to_pylist()
+        chunks = canonical.to_pylist()
         embedding_model = SentenceTransformer(model_name_or_path=embedding_name, device=device)
         # Turn text chunks into a single list
-        text_chunks = [item["chunk_text"] for item in pages_and_chunks]
+        text_chunks = [item["chunk_text"] for item in chunks]
         numpy_embedding = embedding_model.encode(text_chunks, batch_size=batch_size, convert_to_numpy=True)
         return pa.Tensor.from_numpy(numpy_embedding)
+
+    def score_embedding(self, canonical: pa.Tensor, query: str, topk: int=None, embedding_name: str=None, device: str=None,
+                        seed: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                        replace_intent: bool=None, remove_duplicates: bool=None):
+        """ takes chunks from a Table and converts them to a pyarrow tensor of embeddings.
+
+         :param canonical: a list of py-arrow tensors
+         :param query: bool text query to run against the list of tensor embeddings
+         :param topk: (optional) the top k number of embeddings that fit the query
+         :param embedding_name: (optional) the name of the embedding algorithm to use with sentence_transformer
+         :param device: (optional) the device types to use for example 'cpu', 'gpu', 'cuda'
+         :param seed: (optional) a seed value for the random function: default to None
+         :param save_intent: (optional) if the intent contract should be saved to the property manager
+         :param intent_level: (optional) the intent name that groups intent to create a column
+         :param intent_order: (optional) the order in which each intent should run.
+                     - If None: default's to -1
+                     - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                     - if int: added to the level specified, overwriting any that already exist
+
+         :param replace_intent: (optional) if the intent method exists at the level, or default level
+                     - True - replaces the current intent method with the new
+                     - False - leaves it untouched, disregarding the new intent
+
+         :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+         """
+        # intent persist options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # remove intent params
+        query = self._extract_value(query)
+        _seed = seed if isinstance(seed, int) else self._seed()
+        topk = self._extract_value(topk)
+        topk = topk if isinstance(topk, int) else 32
+        embedding_name = self._extract_value(embedding_name)
+        embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-docker-v2'
+        device = self._extract_value(device)
+        device = device if isinstance(device, str) else 'cpu'
+        embedding_model = SentenceTransformer(model_name_or_path=embedding_name, device=device)
+        query_embedding = embedding_model.encode(query, convert_to_tensor=True)
+        embeddings = torch.tensor(canonical.to_numpy(), dtype=torch.float32, device='cpu')
+        dot_scores = util.dot_score(a=query_embedding, b=embeddings)[0]
+        scores, indices = torch.topk(input=dot_scores, k=topk)
+        return scores, indices

@@ -83,7 +83,7 @@ class Controller(AbstractComponent):
         # save the controllers uri_pm_repo path
         if isinstance(uri_pm_repo, str):
             cls.URI_PM_REPO = uri_pm_repo
-        pm_file_type = pm_file_type if isinstance(pm_file_type, str) else 'json'
+        pm_file_type = pm_file_type if isinstance(pm_file_type, str) else 'parquet'
         pm_module = pm_module if isinstance(pm_module, str) else cls.DEFAULT_MODULE
         pm_handler = pm_handler if isinstance(pm_handler, str) else cls.DEFAULT_PERSIST_HANDLER
         _pm = ControllerPropertyManager(task_name=task_name, creator=creator)
@@ -111,7 +111,7 @@ class Controller(AbstractComponent):
         The following environment variables can be set:
         'HADRON_PM_PATH': the property contract path, if not found, uses the system default
         'HADRON_PM_REPO': the property contract should be initially loaded from a read only repo site such as github
-        'HADRON_PM_TYPE': a file type for the property manager. If not found sets as 'json'
+        'HADRON_PM_TYPE': a file type for the property manager. If not found sets as 'parquet'
         'HADRON_PM_MODULE': a default module package, if not set uses component default
         'HADRON_PM_HANDLER': a default handler. if not set uses component default
 
