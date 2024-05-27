@@ -99,13 +99,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         indices = Commons.list_formatter(indices)
         _seed = seed if isinstance(seed, int) else self._seed()
+        sentences = canonical.to_pylist()
         drop_list = []
         for x in indices:
             if isinstance(x, tuple):
                 drop_list += (list(range(x[0], x[1])))
             else:
                 drop_list += [x]
-        df = pd.DataFrame(canonical)
+        df = pd.DataFrame(sentences)
         df.drop(index=drop_list)
         return pa.Table.from_pandas(df)
 
