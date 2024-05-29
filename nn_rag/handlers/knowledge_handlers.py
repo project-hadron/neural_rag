@@ -39,11 +39,16 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
             address = _cc.address
             file_type = load_params.pop('file_type', _ext if len(_ext) > 0 else 'txt')
         self.reset_changed()
-        # parquet
-        if file_type.lower() in ['parquet']:
+        # tensor
+        if file_type.lower() in ['embedded']:
             with pa.OSFile(address, 'rb') as source:
                 pa_tensor = pa.ipc.read_tensor(source)
             return pa_tensor
+        # parquet
+        if file_type.lower() in ['parquet']:
+            if _cc.schema.startswith('http'):
+                address = io.BytesIO(requests.get(address).content)
+            return pq.read_table(address, **load_params)
         # txt
         if file_type.lower() in ['txt']:
             if _cc.schema.startswith('http'):
@@ -135,12 +140,25 @@ class KnowledgePersistHandler(KnowledgeSourceHandler, AbstractPersistHandler):
             return False
         _cc = self.connector_contract
         _address = _cc.parse_address(uri=uri)
-        if isinstance(canonical, pa.Tensor):
+        persist_params = kwargs if isinstance(kwargs, dict) else _cc.kwargs
+        persist_params.update(_cc.parse_query(uri=uri))
+        _, _, _ext = _address.rpartition('.')
+        if not self.connector_contract.schema.startswith('http'):
+            _path, _ = os.path.split(_address)
+            if len(_path) > 0 and not os.path.exists(_path):
+                os.makedirs(_path)
+        file_type = persist_params.pop('file_type', _ext if len(_ext) > 0 else 'parquet')
+        write_params = persist_params.pop('write_params', {})
+        # parquet
+        if file_type.lower() in ['pq', 'parquet']:
+            pq.write_table(canonical, _address, **write_params)
+            return True
+        if file_type.lower() in ['embedding']:
             with pa.OSFile(uri, 'wb') as sink:
                 pa.ipc.write_tensor(canonical, sink)
-        else:
-            pq.write_table(canonical, _address, **kwargs)
-        return True
+            return True
+        # not found
+        raise LookupError('The file format {} is not currently supported for write'.format(file_type))
 
 
     def remove_canonical(self) -> bool:
