@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shutil
 from datetime import datetime
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 
@@ -86,6 +87,23 @@ class FeatureBuilderTest(unittest.TestCase):
         result = handler.load_canonical()
         c = result.column('text').combine_chunks()
         print(len(c))
+
+    def test_write_tensor(self):
+        uri = './working/data/tensor.parquet'
+        cc = ConnectorContract(uri, 'module_name', 'handler')
+        tensor = pa.Tensor.from_numpy(np.array([[1,2,3],[4,5,6]]))
+        handler = KnowledgePersistHandler(cc)
+        result = handler.persist_canonical(tensor)
+        print(result)
+
+    def test_write_parquet(self):
+        uri = './working/data/tensor.parquet'
+        cc = ConnectorContract(uri, 'module_name', 'handler')
+        tbl = pa.table([ pa.array([1, 2, 3, 4, 5]),], names=["col1"])
+        handler = KnowledgePersistHandler(cc)
+        result = handler.persist_canonical(tbl)
+        print(result)
+
 
     def test_raise(self):
         startTime = datetime.now()

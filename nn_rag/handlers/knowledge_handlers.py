@@ -135,8 +135,11 @@ class KnowledgePersistHandler(KnowledgeSourceHandler, AbstractPersistHandler):
             return False
         _cc = self.connector_contract
         _address = _cc.parse_address(uri=uri)
-        with pa.OSFile(uri, 'wb') as sink:
-            pa.ipc.write_tensor(canonical, sink)
+        if isinstance(canonical, pa.Tensor):
+            with pa.OSFile(uri, 'wb') as sink:
+                pa.ipc.write_tensor(canonical, sink)
+        else:
+            pq.write_table(canonical, _address, **kwargs)
         return True
 
 

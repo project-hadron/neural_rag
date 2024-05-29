@@ -11,7 +11,6 @@ services:
       <<: *common-variables
       HADRON_KNOWLEDGE_SOURCE_URI: https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf
       HADRON_KNOWLEDGE_PERSIST_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/eu_ai_act_2024.parquet
-      HADRON_PROFILE_NAME: EU_AI_Act_2024
       # parameters (optional)
       HADRON_NUM_SENTENCE_CHUNK_SIZE: 10
       HADRON_EMBEDDING_BATCH_SIZE: 32
