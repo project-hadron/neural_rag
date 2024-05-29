@@ -21,7 +21,7 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
 
     def supported_types(self) -> list:
         """ The source types supported with this module"""
-        return ['parquet', 'txt', 'pdf', '']
+        return ['parquet', 'txt', 'pdf', 'embedding']
 
     def load_canonical(self, **kwargs) -> pa.Table:
         """ returns the canonical dataset based on the connector contract. """
@@ -40,7 +40,7 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
             file_type = load_params.pop('file_type', _ext if len(_ext) > 0 else 'txt')
         self.reset_changed()
         # tensor
-        if file_type.lower() in ['embedded']:
+        if file_type.lower() in ['embedding']:
             with pa.OSFile(address, 'rb') as source:
                 pa_tensor = pa.ipc.read_tensor(source)
             return pa_tensor
