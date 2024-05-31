@@ -3,36 +3,19 @@ version: '3.9'
 x-common-variables: &common-variables
   # contract repository
   HADRON_DOMAIN_REPO_PATH: https://raw.githubusercontent.com/project-hadron/neural_rag/main/jupyter/knowledge/hadron/contracts/
-  # shared parameters (optional)
-  HADRON_EMBEDDING_BATCH_SIZE: 32
-  HADRON_EMBEDDING_MODEL_NAME: all-mpnet-docker-v2
-  HADRON_EMBEDDING_DEVICE: cpu
 
 services:
-  # European Union AI Act
   eu_ai_act_2024:
     image: gigas64/hadron_neural:0.1
     env_file: credential_env
     environment:
       <<: *common-variables
       HADRON_KNOWLEDGE_SOURCE_URI: https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf
-      HADRON_KNOWLEDGE_EMBED_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/eu_ai_act_2024.embedding
-      HADRON_KNOWLEDGE_CHUNK_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/eu_ai_act_2024.parquet
+      HADRON_KNOWLEDGE_EMBED_URI: milvus//127.0.0.1:19530/rag_chat_embed?subject=ai_legislation
       # parameters (optional)
       HADRON_NUM_SENTENCE_CHUNK_SIZE: 5
-    volumes:
-      - ./cache:/tmp/cache
-
-  # USA Bill of Rights Blueprint
-  usa_ai_bor_2024:
-    image: gigas64/hadron_neural:0.1
-    env_file: credential_env
-    environment:
-      <<: *common-variables
-      HADRON_KNOWLEDGE_SOURCE_URI: https://www.whitehouse.gov/wp-content/uploads/2022/10/Blueprint-for-an-AI-Bill-of-Rights.pdf
-      HADRON_KNOWLEDGE_EMBED_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/usa_ai_bor_2024.embedding
-      HADRON_KNOWLEDGE_CHUNK_URI: s3://project-hadron-cs-repo/domain/knowledgeDb/sa_ai_bort_2024.parquet
-      # parameters (optional)
-      HADRON_NUM_SENTENCE_CHUNK_SIZE: 8
+      HADRON_EMBEDDING_BATCH_SIZE: 32
+      HADRON_EMBEDDING_MODEL_NAME: all-mpnet-docker-v2
+      HADRON_EMBEDDING_DEVICE: cpu
     volumes:
       - ./cache:/tmp/cache
