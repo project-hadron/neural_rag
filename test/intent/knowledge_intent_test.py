@@ -5,7 +5,6 @@ import shutil
 from datetime import datetime
 import pandas as pd
 import pyarrow as pa
-import torch
 from ds_core.properties.property_manager import PropertyManager
 from nn_rag.components.commons import Commons
 from nn_rag import Knowledge
@@ -59,7 +58,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_text(self):
+    def test_text_profiling(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -77,7 +76,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_profiler(tbl)
         self.assertEqual(result.shape, (30, 5))
 
-    def test_profiling(self):
+    def test_text_profiling_cleaning(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -95,8 +94,6 @@ class KnowledgeIntentTest(unittest.TestCase):
         sentences = tools.text_profiler(tbl)
         result = tools.sentence_removal(sentences, indices=[0])
         print(kn.table_report(result, head=3).to_string())
-        
-
 
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
@@ -116,11 +113,34 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        # chunks
-        result = tools.sentence_chunks(tbl)
-        self.assertEqual(result.shape, (3,7))
+        sentences = tools.text_profiler(tbl)
+        result = tools.sentence_chunks(sentences)
+        self.assertEqual(result.shape, (3,6))
         print(result.column_names)
 
+    def test_embedding(self):
+        kn = Knowledge.from_memory()
+        kn.set_source_uri("milvus://localhost:19530/rai")
+        kn.set_persist_uri("milvus://localhost:19530/rai")
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        sentences = tools.text_profiler(tbl)
+        chunks = tools.sentence_chunks(sentences)
+        # save
+        kn.save_persist_canonical(chunks)
+        result = kn.load_persist_canonical(query='long wait')
+        print(result)
 
     def test_raise(self):
         startTime = datetime.now()

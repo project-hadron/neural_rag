@@ -12,6 +12,10 @@ class ControllerPropertyManager(AbstractPropertyManager):
         knowledge_keys = []
         super().__init__(task_name=task_name, root_keys=root_keys, knowledge_keys=knowledge_keys, creator=creator)
 
+    @staticmethod
+    def get_pkg_root():
+        return 'nn_rag'
+
     @property
     def use_case(self) -> dict:
         """Return the use case"""

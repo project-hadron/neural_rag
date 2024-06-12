@@ -532,3 +532,6 @@ class Controller(AbstractComponent):
         drop = drop if isinstance(drop, bool) else True
         return Commons.param2dict(**locals())
 
+    @staticmethod
+    def get_pkg_root():
+        return 'nn_rag'

@@ -4,7 +4,7 @@ import pyarrow as pa
 from ds_core.components.abstract_component import AbstractComponent
 from nn_rag.components.commons import Commons
 from nn_rag.components.discovery import DataDiscovery
-from ds_core.handlers.base_handlers import BasePersistHandler
+
 
 # noinspection PyArgumentList
 class AbstractCommonComponent(AbstractComponent):
@@ -17,7 +17,7 @@ class AbstractCommonComponent(AbstractComponent):
 
     # default connectors module and handlers
 
-    DEFAULT_MODULE = 'nn_rag.handlers.knowledge_handlers'
+    DEFAULT_MODULE = 'ds_core.handlers.knowledge_handlers'
     DEFAULT_SOURCE_HANDLER = 'KnowledgeSourceHandler'
     DEFAULT_PERSIST_HANDLER = 'KnowledgePersistHandler'
     HADRON_PM_MODULE = 'ds_core.handlers.base_handlers'
@@ -104,6 +104,7 @@ class AbstractCommonComponent(AbstractComponent):
             if not self.pm.has_connector(self.CONNECTOR_PERSIST):
                 self.set_persist()
         self.persist_canonical(connector_name=self.CONNECTOR_PERSIST, canonical=canonical, **kwargs)
+        return
 
     def add_column_description(self, column_name: str, description: str, save: bool=None):
         """ adds a description note that is included in with the 'report_column_catalog'"""
@@ -309,3 +310,8 @@ class AbstractCommonComponent(AbstractComponent):
             if not m.startswith('_'):
                 rtn_list.append(m)
         return rtn_list
+
+    @staticmethod
+    def get_pkg_root():
+        return 'nn_rag'
+

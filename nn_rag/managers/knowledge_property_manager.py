@@ -14,3 +14,8 @@ class KnowledgePropertyManager(AbstractPropertyManager):
         root_keys = []
         knowledge_keys = ['describe']
         super().__init__(task_name=task_name, root_keys=root_keys, knowledge_keys=knowledge_keys, creator=creator)
+
+    @staticmethod
+    def get_pkg_root():
+        return 'nn_rag'
+

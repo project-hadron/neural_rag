@@ -8,10 +8,9 @@ import pandas as pd
 import pyarrow as pa
 
 import pyarrow.compute as pc
-from nn_rag.components.commons import Commons
 
 from nn_rag.handlers.knowledge_handlers import KnowledgePersistHandler
-from ds_core.handlers.abstract_handlers import ConnectorContract
+from nn_rag.handlers import ConnectorContract
 from ds_core.properties.property_manager import PropertyManager
 
 # Pandas setup
