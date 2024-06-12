@@ -6,7 +6,7 @@ __author__ = 'Darryl Oatridge'
 class KnowledgePropertyManager(AbstractPropertyManager):
 
     def __init__(self, task_name: str, creator: str):
-        """initialises the properties manager.
+        """initialises the property manager.
 
         :param task_name: the name of the task name within the property manager
         :param creator: a username of this instance

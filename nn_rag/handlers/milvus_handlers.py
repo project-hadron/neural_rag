@@ -24,6 +24,9 @@ class MilvusSourceHandler(AbstractSourceHandler):
             MILVUS_EMBEDDING_DEVICE
             MILVUS_EMBEDDING_BATCH_SIZE
             MILVUS_EMBEDDING_DIM
+            MILVUS_RESPONSE_LIMIT
+            MILVUS_INDEX_METRIC
+            MILVUS_DOC_REF
     """
 
     def __init__(self, connector_contract: ConnectorContract):
@@ -39,6 +42,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
         self._response_limit = int(os.environ.get('MILVUS_RESPONSE_LIMIT', _kwargs.pop('response_limit', '3')))
         self._metric_type = os.environ.get('MILVUS_INDEX_METRIC', _kwargs.pop('index_metric', 'L2'))
+        self._doc_ref = os.environ.get('MILVUS_DOC_REF', _kwargs.pop('document', 'general'))
         self._collection_name = _kwargs.pop('collection', "default")
         description = "Standard Schema"
         # embedding model
@@ -47,7 +51,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self.pymilvus.connections.connect(host=connector_contract.hostname, port=connector_contract.port)
         # Create the collection
         fields = [
-            self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.INT64, auto_id=False, is_primary=True),
+            self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=100),
             self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=500),
             self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
         ]
@@ -88,7 +92,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         params = {"metric_type": self._metric_type, "params": {"nprobe": 10}}
         results = self._collection.search([query_vector], "embeddings", params, limit=self._response_limit, output_fields=["source"])
         self._collection.release()
-        ids = pa.array(results[0].ids, pa.int32())
+        ids = pa.array(results[0].ids, pa.string())
         distances = pa.array(results[0].distances, pa.float32())
         entities = pa.array([x.entity.to_dict()['entity']['source'] for x in results[0]], pa.string())
         return pa.table([ids, distances, entities], names=['id', 'distance', 'source'])
@@ -109,7 +113,7 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         text_chunks = [item["chunk_text"] for item in chunks]
         embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
         data = [
-            [i for i in range(len(text_chunks))],
+            [f"{str(self._doc_ref)}_{str(i)}" for i in range(len(text_chunks))],
             text_chunks,
             embeddings
         ]

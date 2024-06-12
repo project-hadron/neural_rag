@@ -142,6 +142,16 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = kn.load_persist_canonical(query='long wait')
         print(result)
 
+    def test_hanler(self):
+        n_legs = pa.array([2, 4, 5, 100])
+        animals = pa.array(["Flamingo", "Horse", "Brittle stars", "Centipede"])
+        names = ["n_legs", "animals"]
+        tbl = pa.Table.from_arrays([n_legs, animals], names=names)
+        kn = Knowledge.from_memory()
+        kn.set_persist_uri('./working/data')
+        kn.save_persist_canonical(tbl)
+
+
     def test_raise(self):
         startTime = datetime.now()
         with self.assertRaises(KeyError) as context:

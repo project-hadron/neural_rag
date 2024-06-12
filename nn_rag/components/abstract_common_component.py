@@ -17,7 +17,7 @@ class AbstractCommonComponent(AbstractComponent):
 
     # default connectors module and handlers
 
-    DEFAULT_MODULE = 'ds_core.handlers.knowledge_handlers'
+    DEFAULT_MODULE = 'nn_rag.handlers.knowledge_handlers'
     DEFAULT_SOURCE_HANDLER = 'KnowledgeSourceHandler'
     DEFAULT_PERSIST_HANDLER = 'KnowledgePersistHandler'
     HADRON_PM_MODULE = 'ds_core.handlers.base_handlers'
