@@ -38,9 +38,9 @@ class MilvusSourceHandler(AbstractSourceHandler):
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         _embedding_name = os.environ.get('MILVUS_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
         _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', 'cpu'))
-        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '32')))
+        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '12')))
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
-        self._response_limit = int(os.environ.get('MILVUS_RESPONSE_LIMIT', _kwargs.pop('response_limit', '3')))
+        self._response_limit = int(os.environ.get('MILVUS_RESPONSE_LIMIT', _kwargs.pop('response_limit', '5')))
         self._metric_type = os.environ.get('MILVUS_INDEX_METRIC', _kwargs.pop('index_metric', 'L2'))
         self._doc_ref = os.environ.get('MILVUS_DOC_REF', _kwargs.pop('document', 'general'))
         self._collection_name = _kwargs.pop('collection', "default")
@@ -127,5 +127,6 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         if not isinstance(self.connector_contract, ConnectorContract):
             return False
         _cc = self.connector_contract
-        self.pymilvus.utility.drop_collection(self._collection_name)
+        if self.pymilvus.utility.has_collection(self._collection_name):
+            self.pymilvus.utility.drop_collection(self._collection_name)
         return True
