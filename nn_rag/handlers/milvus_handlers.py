@@ -49,20 +49,9 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
         # Start the server
         self.pymilvus.connections.connect(host=connector_contract.hostname, port=connector_contract.port)
-        # Create the collection
-        fields = [
-            self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=100),
-            self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024),
-            self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
-        ]
-        # schema
-        schema = self.pymilvus.CollectionSchema(fields=fields)
-        # collection
-        self._collection = self.pymilvus.Collection(self._collection_name, schema)
-        # index
-        index = {'metric_type': self._metric_type, "params": {}}
-        self._collection.create_index("embeddings", index)
+        self._collection = None
         self._changed_flag = True
+
 
     def supported_types(self) -> list:
         """ The source types supported with this module"""
@@ -112,6 +101,20 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         chunks = canonical.to_pylist()
         text_chunks = [item["chunk_text"] for item in chunks]
         embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
+        # Create the collection
+        fields = [
+            self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=100),
+            self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024),
+            self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
+        ]
+        # schema
+        schema = self.pymilvus.CollectionSchema(fields=fields)
+        # collection
+        self._collection = self.pymilvus.Collection(self._collection_name, schema)
+        # index
+        index = {'metric_type': self._metric_type, "params": {}}
+        self._collection.create_index("embeddings", index)
+
         data = [
             [f"{str(self._doc_ref)}_{str(i)}" for i in range(len(text_chunks))],
             text_chunks,

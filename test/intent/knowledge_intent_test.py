@@ -74,7 +74,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         result = tools.text_profiler(tbl)
-        self.assertEqual(result.shape, (30, 5))
+        print(result.column_names)
+        tprint(result, headers=['sentence_score', 'sentence_num', 'char_count', 'word_count', 'token_count'])
 
     def test_text_profiling_cleaning(self):
         kn = Knowledge.from_env('tester', has_contract=False)

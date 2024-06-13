@@ -3,6 +3,7 @@ import re
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
+from sentence_transformers import SentenceTransformer, util
 from spacy.lang.en import English
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
@@ -165,7 +166,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_profiler(self, canonical: pa.Table, header: str=None, seed: int=None,
+    def text_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None,
                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                       replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
@@ -173,7 +174,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a Table with a text column
         :param header: (optional) The name of the target text column, default 'text'
-        :param seed: (optional) a seed value for the random function: default to None
+        :param embedding_name: (optional) the name of the embedding model to use to score familiarity
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -195,7 +196,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
-        _seed = seed if isinstance(seed, int) else self._seed()
+        embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-base-v2'
+        embedding_model = SentenceTransformer(model_name_or_path=embedding_name)
         nlp = English()
         nlp.add_pipe("sentencizer")
         text = canonical.to_pylist()
@@ -205,11 +207,16 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
             for num, s in enumerate(sents):
                 sentences.append({'sentence': s,
+                                  'sentence_score': 0,
                                   'sentence_num': num,
                                   "char_count": len(s),
                                   "word_count": len(s.split(" ")),
                                   "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                                   })
+                if num < len(sents)-1:
+                    v1 = embedding_model.encode(s)
+                    v2 = embedding_model.encode(sents[num+1])
+                    sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None,
@@ -260,7 +267,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
                 chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
-
 
     def query(self, query: str, connector_name: str=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
               replace_intent: bool=None, remove_duplicates: bool=None):
