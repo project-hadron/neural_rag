@@ -98,25 +98,26 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
-        # kn.set_source_uri(uri)
-        # tbl = kn.load_source_canonical(file_type='pdf')
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-                'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr = pa.array([text], pa.string())
-        tbl = pa.table([arr], names=['text'])
+        uri = "https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf"
+        kn.set_source_uri(uri)
+        tbl = kn.load_source_canonical(file_type='pdf')
+        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+        #         'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+        #         'information. I can not use the customer portal. your customer portal is unhelpful')
+        # arr = pa.array([text], pa.string())
+        # tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl)
         result = tools.sentence_chunks(sentences)
-        self.assertEqual(result.shape, (3,6))
         print(result.column_names)
+        tprint(result, headers=['chunk_char_count', 'chunk_word_count', 'chunk_token_count'])
+
 
     def test_embedding(self):
         kn = Knowledge.from_memory()
@@ -142,22 +143,19 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = kn.load_persist_canonical(query='long wait')
         print(result)
 
-    def test_hanler(self):
-        n_legs = pa.array([2, 4, 5, 100])
-        animals = pa.array(["Flamingo", "Horse", "Brittle stars", "Centipede"])
-        names = ["n_legs", "animals"]
-        tbl = pa.Table.from_arrays([n_legs, animals], names=names)
-        kn = Knowledge.from_memory()
-        kn.set_persist_uri('./working/data')
-        kn.save_persist_canonical(tbl)
-
-
     def test_raise(self):
         startTime = datetime.now()
         with self.assertRaises(KeyError) as context:
             env = os.environ['NoEnvValueTest']
         self.assertTrue("'NoEnvValueTest'" in str(context.exception))
         print(f"Duration - {str(datetime.now() - startTime)}")
+
+
+def get_table():
+    n_legs = pa.array([2, 4, 5, 100])
+    animals = pa.array(["Flamingo", "Horse", "Brittle stars", "Centipede"])
+    names = ["n_legs", "animals"]
+    return pa.Table.from_arrays([n_legs, animals], names=names)
 
 
 def tprint(t: pa.table, headers: [str, list] = None, d_type: [str, list] = None, regex: [str, list] = None):

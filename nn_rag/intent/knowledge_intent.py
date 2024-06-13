@@ -1,12 +1,9 @@
 import inspect
-import os
-
-import torch
+import re
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 from spacy.lang.en import English
-from sentence_transformers import util, SentenceTransformer
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 
@@ -215,14 +212,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                   })
         return pa.Table.from_pylist(sentences)
 
-    def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None, seed: int=None,
+    def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None,
                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                         replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a profile Table and converts the sentences into chunks ready for embedding.
 
         :param canonical: a text profile Table
-        :param num_sentence_chunk_size: (optional) The number of sentences in each chunk. Default is 10
-        :param seed: (optional) a seed value for the random function: default to None
+        :param num_sentence_chunk_size: (optional) The number of chunks to break a sentence into. Default is 500
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -243,23 +239,26 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         num_sentence_chunk_size = self._extract_value(num_sentence_chunk_size)
-        num_sentence_chunk_size = num_sentence_chunk_size if isinstance(num_sentence_chunk_size, int) else 10
-        _seed = seed if isinstance(seed, int) else self._seed()
+        num_sentence_chunk_size = num_sentence_chunk_size if isinstance(num_sentence_chunk_size, int) else 500
         nlp = English()
         nlp.add_pipe("sentencizer")
         sentences = canonical.to_pylist()
+
         chunks = []
-        for count, idx in enumerate(range(0, len(sentences), num_sentence_chunk_size)):
-            paragraph = ''
-            for chunk in sentences[idx:idx + num_sentence_chunk_size]:
-                paragraph += chunk['sentence'] + ' '
-            paragraph = paragraph.strip()
-            chunk_dict = {"chunk_number": count,
-                          "chunk_sentence_count": num_sentence_chunk_size, "chunk_char_count": len(paragraph),
-                          "chunk_word_count": len([word for word in paragraph.split(" ")]),
-                          "chunk_token_count": round(len(paragraph) / 4),
-                          "chunk_text": paragraph.strip(),}
-            chunks.append(chunk_dict)
+        for item in sentences:
+            for sentence_chunk in [item["sentence"][i:i + num_sentence_chunk_size] for i in range(0, len(item["sentence"]), num_sentence_chunk_size)]:
+                chunk_dict = {}
+                # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
+                joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
+                joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
+                chunk_dict["chunk_text"] = joined_sentence_chunk
+
+                # Get stats about the chunk
+                chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
+                chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
+                chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4  # 1 token = ~4 characters
+
+                chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
 
 
