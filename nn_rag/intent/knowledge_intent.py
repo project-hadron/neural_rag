@@ -196,8 +196,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
-        embedding_name = embedding_name if isinstance(embedding_name, str) else 'all-mpnet-base-v2'
-        embedding_model = SentenceTransformer(model_name_or_path=embedding_name)
+        embedding_model = SentenceTransformer(model_name_or_path=embedding_name) if embedding_name else None # 'all-mpnet-base-v2'
         nlp = English()
         nlp.add_pipe("sentencizer")
         text = canonical.to_pylist()
@@ -213,7 +212,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                   "word_count": len(s.split(" ")),
                                   "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                                   })
-                if num < len(sents)-1:
+                if embedding_name and num < len(sents)-1:
                     v1 = embedding_model.encode(s)
                     v2 = embedding_model.encode(sents[num+1])
                     sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
