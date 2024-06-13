@@ -196,6 +196,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
+        embedding_name = self._extract_value(embedding_name)
         embedding_model = SentenceTransformer(model_name_or_path=embedding_name) if embedding_name else None # 'all-mpnet-base-v2'
         nlp = English()
         nlp.add_pipe("sentencizer")
