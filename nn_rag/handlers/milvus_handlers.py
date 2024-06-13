@@ -52,7 +52,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         # Create the collection
         fields = [
             self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=100),
-            self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=500),
+            self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024),
             self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
         ]
         # schema
@@ -127,4 +127,5 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         if not isinstance(self.connector_contract, ConnectorContract):
             return False
         _cc = self.connector_contract
+        self.pymilvus.utility.drop_collection(self._collection_name)
         return True
