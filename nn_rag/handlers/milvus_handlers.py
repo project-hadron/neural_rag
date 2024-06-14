@@ -25,7 +25,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
             MILVUS_EMBEDDING_BATCH_SIZE
             MILVUS_EMBEDDING_DIM
             MILVUS_INDEX_CLUSTERS
-            MILVUS_INDEX_METRIC
+            MILVUS_INDEX_SIMILARITY_TYPE
             MILVUS_QUERY_SEARCH_LIMIT
             MILVUS_QUERY_NUM_SIMILARITY
     """
@@ -40,6 +40,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         _embedding_name = os.environ.get('MILVUS_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
         _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', 'cpu'))
         self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
+        self._index_type = os.environ.get('MILVUS_INDEX_SIMILARITY_TYPE', _kwargs.pop('index_type', 'L2'))
         self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '5')))
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '8')))
         self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '32')))
@@ -65,7 +66,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
             self._collection = self.pymilvus.Collection(self._collection_name, schema)
             # index
             index_params = {
-                "metric_type": "L2",
+                "metric_type": self._index_type,
                 "index_type": "IVF_FLAT",
                 "params": {"nlist": self._index_clusters}
             }
