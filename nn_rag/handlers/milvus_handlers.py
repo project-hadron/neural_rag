@@ -157,5 +157,5 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
     def remove_collection(self) -> bool:
         """remove a collection"""
         if self.pymilvus.utility.has_collection(self._collection_name):
-            self.pymilvus.utility.delete(self._collection_name)
+            self.pymilvus.utility.drop_collection(self._collection_name)
         return True
