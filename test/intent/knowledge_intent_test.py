@@ -10,6 +10,7 @@ from nn_rag.components.commons import Commons
 from nn_rag import Knowledge
 from nn_rag.intent.knowledge_intent import KnowledgeIntent
 
+
 # Pandas setup
 pd.set_option('max_colwidth', 320)
 pd.set_option('display.max_rows', 100)
@@ -141,6 +142,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         chunks = tools.sentence_chunks(sentences)
         # save
         kn.save_persist_canonical(chunks)
+        result = kn.load_persist_canonical(query='long wait')
+        kn.remove_canonical(kn.CONNECTOR_PERSIST)
         result = kn.load_persist_canonical(query='long wait')
         print(result)
 
