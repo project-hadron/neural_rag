@@ -13,7 +13,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
     using Python code, while MySQL provides the database functionality needed to store and retrieve data efficiently.
 
         URI example
-            uri = "milvus://host:port/collection"
+            uri = "milvus://host:port/database?collection=<name>"
 
         params:
             collection: The name of the collection
@@ -37,6 +37,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         super().__init__(connector_contract)
         # reset to use dialect
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
+        _database = self.connector_contract.path[1:] if self.connector_contract.path[1:] else 'rai'
         _embedding_name = os.environ.get('MILVUS_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
         _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', 'cpu'))
         self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
@@ -51,6 +52,10 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
         # Start the server
         self.pymilvus.connections.connect(host=connector_contract.hostname, port=connector_contract.port)
+        if _database in self.pymilvus.db.list_database():
+            self.pymilvus.db.using_database(_database)
+        else:
+            self.pymilvus.db.create_database(_database)
         # Create the collection
         if self.pymilvus.utility.has_collection(self._collection_name):
             self._collection = self.pymilvus.Collection(self._collection_name)
