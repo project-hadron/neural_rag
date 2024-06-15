@@ -14,7 +14,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """
 
     def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
-                            seed: int=None, save_intent: bool=None, intent_order: int=None,
+                            save_intent: bool=None, intent_order: int=None,
                             intent_level: [int, str]=None, replace_intent: bool=None,
                             remove_duplicates: bool=None) -> pa.Table:
         """ Takes the column name header from the canonical and applies the condition. Where the condition
@@ -37,7 +37,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param header: the header for the target values to change
         :param condition: a list of tuple or tuples in the form [(comparison, operation, logic)]
         :param mask_null: (optional) if nulls in the other they require a value representation.
-        :param seed: (optional) the random seed. defaults to current datetime
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the column name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -59,12 +58,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
-        seed = seed if isinstance(seed, int) else self._seed()
         h_col = canonical.column(header).combine_chunks()
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
-    def sentence_removal(self, canonical: pa.Table, indices:list=None, seed: int=None, to_header: str=None,
+    def sentence_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
                          save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                          replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a canonical of sentences from the text_profiler method or allows the given sentence indices
@@ -77,7 +75,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a Table of sentences and stats
         :param indices: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param to_header: (optional) an optional name to call the column
-        :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -98,7 +95,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         indices = Commons.list_formatter(indices)
-        _seed = seed if isinstance(seed, int) else self._seed()
         sentences = canonical.to_pylist()
         drop_list = []
         for x in indices:
@@ -112,7 +108,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
 
     def pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
-                        max_replacements: int=None, seed: int=None, to_header: str=None, save_intent: bool=None,
+                        max_replacements: int=None, to_header: str=None, save_intent: bool=None,
                         intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
                         remove_duplicates: bool=None):
         """ For each string in header, replace non-overlapping substrings that match the given literal pattern
@@ -128,7 +124,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param is_regex: (optional) if the pattern is a regex. Default False
         :param max_replacements: (optional) The maximum number of strings to replace in each input value.
         :param to_header: (optional) an optional name to call the column
-        :param seed: (optional) a seed value for the random function: default to None
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -151,7 +146,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = self._extract_value(header)
         to_header  = self._extract_value(to_header)
         is_regex = is_regex if isinstance(is_regex, bool) else False
-        _seed = seed if isinstance(seed, int) else self._seed()
         c = canonical.column(header).combine_chunks()
         is_dict = False
         if pa.types.is_dictionary(c.type):

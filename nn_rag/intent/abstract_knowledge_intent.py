@@ -11,7 +11,7 @@ from nn_rag.managers.knowledge_property_manager import KnowledgePropertyManager
 class AbstractKnowledgeIntentModel(AbstractIntentModel):
 
     _INTENT_PARAMS = ['self', 'save_intent', 'intent_level', 'intent_order',
-                      'replace_intent', 'remove_duplicates', 'seed']
+                      'replace_intent', 'remove_duplicates']
 
     def __init__(self, property_manager: KnowledgePropertyManager, default_save_intent: bool=None,
                  default_intent_level: [str, int, float]=None, order_next_available: bool=None,
@@ -45,15 +45,13 @@ class AbstractKnowledgeIntentModel(AbstractIntentModel):
                 rtn_list.append(m)
         return rtn_list
 
-    def run_intent_pipeline(self, canonical: pa.Table=None, intent_level: [str, int]=None, seed: int=None,
+    def run_intent_pipeline(self, canonical: pa.Table=None, intent_level: [str, int]=None,
                             simulate: bool=None, **kwargs) -> pa.Table:
         """Collectively runs all parameterised intent taken from the property manager against the code docker as
-        defined by the intent_contract. The whole run can be seeded though any parameterised seeding in the intent
-        contracts will take precedence
+        defined by the intent_contract.
 
         :param canonical: a direct or generated pd.DataFrame. see context notes below
         :param intent_level: (optional) a single intent_level to run
-        :param seed: (optional) a seed value that will be applied across the run: default to None
         :param simulate: (optional) returns a report of the order of run and return the indexed column order of run
         :return: a pa.Table
         """
@@ -77,8 +75,6 @@ class AbstractKnowledgeIntentModel(AbstractIntentModel):
                             continue
                         params.update(params.pop('kwargs', {}))
                         params.update({'save_intent': False})
-                        if isinstance(seed, int):
-                            params.update({'seed': seed})
                         _ = params.pop('intent_creator', 'Unknown')
                         canonical = eval(f"self.{method}(canonical=canonical, **params)", globals(), locals())
                 except ValueError as ve:
@@ -92,16 +88,6 @@ class AbstractKnowledgeIntentModel(AbstractIntentModel):
     """
         PRIVATE METHODS SECTION
     """
-
-    @staticmethod
-    def _seed(seed: int=None, increment: bool=False):
-        if not isinstance(seed, int):
-            return int(time.time() * np.random.default_rng().random())
-        if increment:
-            seed += 1
-            if seed > 2 ** 31:
-                seed = int(time.time() * np.random.default_rng(seed=seed-1).random())
-        return seed
 
     @staticmethod
     def _extract_mask(column: pa.Array, condition: list, mask_null: bool=None):
