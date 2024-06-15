@@ -75,8 +75,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         result = tools.text_profiler(tbl)
-        print(result.column_names)
-        tprint(result, headers=['sentence_score', 'sentence_num', 'char_count', 'word_count', 'token_count'])
+        print(kn.table_report(result, head=5).to_string())
 
     def test_text_profiling_cleaning(self):
         kn = Knowledge.from_env('tester', has_contract=False)
@@ -100,25 +99,24 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        uri = "https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf"
-        kn.set_source_uri(uri)
-        tbl = kn.load_source_canonical(file_type='pdf')
-        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-        #         'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-        #         'information. I can not use the customer portal. your customer portal is unhelpful')
-        # arr = pa.array([text], pa.string())
-        # tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_profiler(tbl)
-        result = tools.sentence_chunks(sentences)
-        print(result.column_names)
-        tprint(result, headers=['chunk_char_count', 'chunk_word_count', 'chunk_token_count'])
+        # uri = "https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf"
+        # kn.set_source_uri(uri)
+        # tbl = kn.load_source_canonical(file_type='pdf')
+        text = ('You took too long. You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        sentences = tools.text_profiler(tbl, embedding_name='all-mpnet-base-v2')
+        result = tools.sentence_chunks(sentences, char_chunk_size=500)
+        print(kn.table_report(result).to_string())
 
 
     def test_embedding(self):

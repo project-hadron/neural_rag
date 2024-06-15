@@ -213,13 +213,17 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                     sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
         return pa.Table.from_pylist(sentences)
 
-    def sentence_chunks(self, canonical: pa.Table, num_sentence_chunk_size: int=None,
+    def sentence_chunks(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                         replace_intent: bool=None, remove_duplicates: bool=None):
-        """ Taking a profile Table and converts the sentences into chunks ready for embedding.
+        """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
+        the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
+        the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
+        small sentences.
 
         :param canonical: a text profile Table
-        :param num_sentence_chunk_size: (optional) The number of chunks to break a sentence into. Default is 500
+        :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
+        :param temperature: (optional) a value between 0 and 1 representing the temperature between sentences
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -239,15 +243,35 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
-        num_sentence_chunk_size = self._extract_value(num_sentence_chunk_size)
-        num_sentence_chunk_size = num_sentence_chunk_size if isinstance(num_sentence_chunk_size, int) else 500
+        char_chunk_size = self._extract_value(char_chunk_size)
+        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
+        temperature = self._extract_value(temperature)
+        temperature = temperature if isinstance(temperature, float) else 1
         nlp = English()
         nlp.add_pipe("sentencizer")
         sentences = canonical.to_pylist()
-
+        if 1 > temperature > 0:
+            # sort by score
+            parsed_sentence = [sentences[0]["sentence"]]
+            score = sentences[0]["sentence_score"]
+            for item in sentences[1:]:
+                if score > temperature:
+                    parsed_sentence[-1] += " " + item["sentence"]
+                else:
+                    parsed_sentence.append(item["sentence"])
+                score = item['sentence_score']
+        else:
+            # text
+            parsed_sentence = ''
+            for item in sentences:
+                parsed_sentence += " " + item['sentence']
+            parsed_sentence = [parsed_sentence.strip()]
+        # chunks
         chunks = []
-        for item in sentences:
-            for sentence_chunk in [item["sentence"][i:i + num_sentence_chunk_size] for i in range(0, len(item["sentence"]), num_sentence_chunk_size)]:
+        for sentence in parsed_sentence:
+            while len(sentence) > 0:
+                sentence_chunk = sentence[:char_chunk_size]
+                sentence = sentence[char_chunk_size:]
                 chunk_dict = {}
                 # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
                 joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
