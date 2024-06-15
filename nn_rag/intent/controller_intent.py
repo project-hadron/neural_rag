@@ -113,7 +113,7 @@ class ControllerIntentModel(AbstractIntentModel):
             canonical = kn.load_source_canonical()
         else:
             canonical = None
-        canonical = kn.intent_model.run_intent_pipeline(canonical=canonical, intent_levels=intent_level, seed=seed)
+        canonical = kn.intent_model.run_intent_pipeline(canonical=canonical, intent_levels=intent_level)
         if persist:
             for out in Commons.list_formatter(persist):
                 if kn.pm.has_connector(out):
