@@ -68,6 +68,8 @@ class ControllerIntentModel(AbstractIntentModel):
                     _ = params.pop('intent_creator', 'Unknown')
                     # add excluded params and set to False
                     params.update({'save_intent': False})
+                    # run the action
+                    params.update({'register_only': False})
                     # add the controller_repo if given
                     if isinstance(controller_repo, str) and 'uri_pm_repo' not in params.keys():
                         params.update({'uri_pm_repo': controller_repo})
@@ -75,7 +77,7 @@ class ControllerIntentModel(AbstractIntentModel):
         return shape
 
     def knowledge(self, task_name: str, source: str=None, persist: [str, list]=None, columns: [str, list]=None,
-                  seed: int=None, save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
+                  register_only: bool=None, save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
                   replace_intent: bool=None, remove_duplicates: bool=None, **kwargs):
         """ register a Knowledge component task pipeline
 
@@ -83,7 +85,7 @@ class ControllerIntentModel(AbstractIntentModel):
         :param source:
         :param task_name: the task_name reference for this component
         :param columns: (optional) a single or list of intent_level to run, if list, run in order given
-        :param seed: (optional) a seed for the run
+        :param register_only: (optional) if the action should only be registered and not run
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the level name that groups intent by a reference name
         :param intent_order: (optional) the order in which each intent should run.
@@ -99,7 +101,10 @@ class ControllerIntentModel(AbstractIntentModel):
         self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
                                    intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
-        # create the event book
+        # create the
+        register_only = register_only if isinstance(register_only, bool) else True
+        if register_only:
+            return
         kn: Knowledge = eval(f"Knowledge.from_env(task_name=task_name, default_save=False, "
                                 f"has_contract=True, **{kwargs})", globals(), locals())
         if source and kn.pm.has_connector(source):
@@ -115,5 +120,5 @@ class ControllerIntentModel(AbstractIntentModel):
                     kn.save_canonical(connector_name=out, canonical=canonical)
         else:
             kn.save_persist_canonical(canonical=canonical)
-        return canonical.shape
+        return
 

@@ -8,18 +8,19 @@ __author__ = 'Darryl Oatridge'
 
 
 class MilvusSourceHandler(AbstractSourceHandler):
-    """ This handler class uses both SQLAlchemy and pymysql. Together, SQLAlchemy and pymysql provide a powerful
-    toolset for working with databases and faster connectivity. SQLAlchemy allows developers to interact with MySQL
-    using Python code, while MySQL provides the database functionality needed to store and retrieve data efficiently.
+    """ This handler class uses pymilvus package. Milvus is an open-source vector
+    database designed to manage and search large-scale vector data. It is designed to
+    store, index, and search vector data efficiently, targeting AI-driven applications
+    that require efficient handling of unstructured data.
 
         URI example
-            uri = "milvus://host:port/database?collection=<name>"
+            uri = "milvus://host:port/database?collection=<name>&doc_ref=<name>"
 
         params:
             collection: The name of the collection
+            doc_ref: a name to reference the document
 
-        Environment:
-            MILVUS_DOC_REF
+        Environment Hyperparams:
             MILVUS_EMBEDDING_NAME
             MILVUS_EMBEDDING_DEVICE
             MILVUS_EMBEDDING_BATCH_SIZE
@@ -46,7 +47,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
         self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '32')))
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
-        self._doc_ref = os.environ.get('MILVUS_DOC_REF', _kwargs.pop('document', 'general'))
+        self._doc_ref = _kwargs.pop('doc_ref', 'general')
         self._collection_name = _kwargs.pop('collection', "default")
         # embedding model
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
