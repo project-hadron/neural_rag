@@ -214,8 +214,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
-                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                        replace_intent: bool=None, remove_duplicates: bool=None):
+                        minimum_chunk_size: int=None, overlap: int=None, save_intent: bool=None,
+                        intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                        remove_duplicates: bool=None):
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
@@ -224,6 +225,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a text profile Table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
         :param temperature: (optional) a value between 0 and 1 representing the temperature between sentences
+        :param minimum_chunk_size: (optional) if semantic search is used, the minimum chunk size
+        :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -244,7 +247,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         char_chunk_size = self._extract_value(char_chunk_size)
-        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
+        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 256
+        overlap = self._extract_value(overlap)
+        overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
         temperature = self._extract_value(temperature)
         temperature = temperature if isinstance(temperature, float) else 1
         nlp = English()
@@ -256,7 +261,17 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             score = sentences[0]["sentence_score"]
             for item in sentences[1:]:
                 if score > temperature:
-                    parsed_sentence[-1] += " " + item["sentence"]
+                    if len(parsed_sentence[-1]) + item['char_count'] > char_chunk_size:
+                        previous = parsed_sentence.pop()
+                        *first, last = previous.split('. ')
+                        first = [item + '.' for item in first]
+                        parsed_sentence.append(first)
+                        parsed_sentence.append(last + " " + item["sentence"])
+                    else:
+                        parsed_sentence[-1] += " " + item["sentence"]
+                elif len(parsed_sentence[-1]) + item['char_count'] < char_chunk_size:
+                    if score <= temperature:
+                        parsed_sentence[-1] += " " + item["sentence"]
                 else:
                     parsed_sentence.append(item["sentence"])
                 score = item['sentence_score']
@@ -270,7 +285,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         chunks = []
         for sentence in parsed_sentence:
             while len(sentence) > 0:
-                sentence_chunk = sentence[:char_chunk_size]
+                sentence_chunk = sentence[:char_chunk_size + overlap]
                 sentence = sentence[char_chunk_size:]
                 chunk_dict = {}
                 # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
