@@ -1,9 +1,6 @@
 from __future__ import annotations
-import pandas as pd
-import pyarrow as pa
-from nn_rag.components.commons import Commons
-from nn_rag.intent.knowledge_intent import KnowledgeIntent
-from nn_rag.managers.knowledge_property_manager import KnowledgePropertyManager
+from nn_rag.intent.agent_intent import AgentIntent
+from nn_rag.managers.agent_property_manager import AgentPropertyManager
 from nn_rag.components.abstract_common_component import AbstractCommonComponent
 
 __author__ = 'Darryl Oatridge'
@@ -48,8 +45,8 @@ class Knowledge(AbstractCommonComponent):
         pm_file_type = pm_file_type if isinstance(pm_file_type, str) else 'parquet'
         pm_module = pm_module if isinstance(pm_module, str) else cls.HADRON_PM_MODULE
         pm_handler = pm_handler if isinstance(pm_handler, str) else cls.HADRON_PM_HANDLER
-        _pm = KnowledgePropertyManager(task_name=task_name, creator=creator)
-        _intent_model = KnowledgeIntent(property_manager=_pm, default_save_intent=default_save_intent,
+        _pm = AgentPropertyManager(task_name=task_name, creator=creator)
+        _intent_model = AgentIntent(property_manager=_pm, default_save_intent=default_save_intent,
                                              default_intent_level=default_intent_level,
                                              order_next_available=order_next_available,
                                              default_replace_intent=default_replace_intent)
@@ -62,24 +59,10 @@ class Knowledge(AbstractCommonComponent):
                    align_connectors=align_connectors)
 
     @property
-    def pm(self) -> KnowledgePropertyManager:
+    def pm(self) -> AgentPropertyManager:
         return self._component_pm
 
     @property
-    def tools(self) -> KnowledgeIntent:
+    def tools(self) -> AgentIntent:
         return self._intent_model
-
-    def remove_collection(self, connector_name: str, **kwargs):
-        """removes the current collection.
-
-        :param connector_name: the name or label to identify and reference the connector
-        :param kwargs: arguments to be passed to the handler on remove
-        """
-        if self.pm.has_connector(connector_name):
-            handler = self.pm.get_connector_handler(connector_name)
-            handler.remove_collection(**kwargs)
-            return
-        raise ConnectionError("The connector name {} was not found.".format(connector_name))
-
-
 
