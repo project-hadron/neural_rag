@@ -214,9 +214,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
-                        minimum_chunk_size: int=None, overlap: int=None, save_intent: bool=None,
-                        intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                        remove_duplicates: bool=None):
+                        overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                        intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
@@ -225,7 +224,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a text profile Table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
         :param temperature: (optional) a value between 0 and 1 representing the temperature between sentences
-        :param minimum_chunk_size: (optional) if semantic search is used, the minimum chunk size
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
