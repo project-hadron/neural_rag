@@ -77,7 +77,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_profiler(tbl)
         print(kn.table_report(result, head=5).to_string())
 
-    def test_text_profiling_cleaning(self):
+    def test_text_profiling_max(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -92,9 +92,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_profiler(tbl)
-        result = tools.sentence_removal(sentences, indices=[0])
-        print(kn.table_report(result, head=3).to_string())
+        result =  tools.text_profiler(tbl, max_char_size=50000)
+        print(kn.table_report(result, head=20).to_string())
 
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
@@ -137,9 +136,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl, embedding_name='all-mpnet-base-v2')
-        result = tools.sentence_chunks(sentences, char_chunk_size=100, temperature=0.9, minimum_chunk_size=30)
+        result = tools.sentence_chunks(sentences, char_chunk_size=100, temperature=0.9)
         print(kn.table_report(result).to_string())
-
 
     def test_embedding(self):
         kn = Knowledge.from_memory()

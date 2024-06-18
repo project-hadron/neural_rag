@@ -197,27 +197,28 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         nlp = English()
         nlp.add_pipe("sentencizer")
         text = canonical.to_pylist()
-        for idx in range(len(text)):
-            if len(text[idx]) > max_char_size:
-                text = " ".join(text)
-                text = [text[i:i + max_char_size] for i in range(0, len(text), max_char_size)]
-                break
-        sentences = []
+        sub_text = ''
         for item in text:
-            sents = list(nlp(item[header]).sents)
+            sub_text = [item[header][i:i + max_char_size] for i in range(0, len(item[header]), max_char_size)]
+        text = sub_text
+        sents=[]
+        for item in text:
+            sents += list(nlp(item).sents)
             sents = [str(sentence) for sentence in sents]
-            for num, s in enumerate(sents):
-                sentences.append({'sentence': s,
-                                  'sentence_score': 0,
-                                  'sentence_num': num,
-                                  "char_count": len(s),
-                                  "word_count": len(s.split(" ")),
-                                  "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
-                                  })
-                if embedding_name and num < len(sents)-1:
-                    v1 = embedding_model.encode(s)
-                    v2 = embedding_model.encode(sents[num+1])
-                    sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
+        sentences = []
+        for num, s in enumerate(sents):
+            sentences.append({'sentence': s,
+                              'sentence_score': 0,
+                              'sentence_num': num,
+                              "char_count": len(s),
+                              "word_count": len(s.split(" ")),
+                              "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                              })
+            if embedding_name and num < len(sents)-1:
+                v1 = embedding_model.encode(s)
+                v2 = embedding_model.encode(sents[num+1])
+                sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
+
         return pa.Table.from_pylist(sentences)
 
     def sentence_chunks(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
