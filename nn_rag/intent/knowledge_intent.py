@@ -160,6 +160,35 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
+    def page_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
+                      save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                      replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
+        accompanying statistics to enable discovery.
+
+        :param canonical: a Table with a text column
+        :param header: (optional) The name of the target text column, default 'text'
+        :param embedding_name: (optional) the name of the embedding model to use to score familiarity
+        :param max_char_size: (optional) the maximum number of characters to process at one time
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent persist options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # remove intent params
+
     def text_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                       replace_intent: bool=None, remove_duplicates: bool=None):
@@ -191,7 +220,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
-        marks_char_size = max_char_size if isinstance(max_char_size, int) else 2^19
+        max_char_size = max_char_size if isinstance(max_char_size, int) else 2^19
         embedding_name = self._extract_value(embedding_name)
         embedding_model = SentenceTransformer(model_name_or_path=embedding_name) if embedding_name else None # 'all-mpnet-base-v2'
         nlp = English()
