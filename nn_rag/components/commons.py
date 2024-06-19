@@ -15,28 +15,6 @@ class Commons(CoreCommons):
         return CoreCommons.list_formatter(value)
 
     @staticmethod
-    def date2value(dates: Any, day_first: bool=True, year_first: bool=False) -> list:
-        """ converts a date to a number represented by to number of microseconds to the epoch"""
-        values = pd.Series(pd.to_datetime(dates, errors='coerce', dayfirst=day_first, yearfirst=year_first))
-        v_native = values.dt.tz_convert(None) if values.dt.tz else values
-        null_idx = values[values.isna()].index
-        values.iloc[null_idx] = pd.to_datetime(0)
-        result =  ((v_native - pd.Timestamp("1970-01-01")) / pd.Timedelta(microseconds=1)).astype(int).to_list()
-        values.iloc[null_idx] = None
-        return result
-
-    @staticmethod
-    def value2date(values: Any, dt_tz: Any=None, date_format: str=None) -> list:
-        """ converts an integer into a datetime. The integer should represent time in microseconds since the epoch"""
-        if dt_tz:
-            dates = pd.Series(pd.to_datetime(values, unit='us', utc=True)).map(lambda x: x.tz_convert(dt_tz))
-        else:
-            dates = pd.Series(pd.to_datetime(values, unit='us'))
-        if isinstance(date_format, str):
-            dates = dates.dt.strftime(date_format)
-        return dates.to_list()
-
-    @staticmethod
     def report(canonical: pd.DataFrame, index_header: [str, list]=None, bold: [str, list]=None,
                large_font: [str, list]=None, precision: int=None):
         """ generates a stylised report
@@ -76,10 +54,11 @@ class Commons(CoreCommons):
         return df_style
 
     @staticmethod
-    def table_report(t: pa.Table, head: int=None, index_header: [str, list]=None, bold: [str, list]=None,
+    def table_report(t: pa.Table, top: int=None, headers: [str, list]=None, d_type: [str, list]=None,
+                     regex: [str, list]=None, index_header: [str, list]=None, bold: [str, list]=None,
                      large_font: [str, list]=None):
         """ generates a stylised version of the pyarrow table """
-        df = t.to_pandas()
-        if isinstance(head, int):
-            df = df[:head]
+        top = top if isinstance(top, int) else 10
+        report = Commons.filter_columns(t.slice(0, top), headers=headers, d_types=d_type, regex=regex)
+        df = report.to_pandas()
         return Commons.report(df, index_header=index_header, bold=bold, large_font=large_font)

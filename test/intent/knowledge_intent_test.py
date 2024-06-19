@@ -80,20 +80,23 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_profiling_max(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-                'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr = pa.array([text], pa.string())
-        tbl = pa.table([arr], names=['text'])
-        result =  tools.text_profiler(tbl, max_char_size=300)
-        print(kn.table_report(result, head=20).to_string())
+        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+        #         'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+        #         'information. I can not use the customer portal. your customer portal is unhelpful')
+        # arr = pa.array([text], pa.string())
+        # tbl = pa.table([arr], names=['text'])
+        uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
+        tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
+        result =  tools.text_profiler(tbl, max_char_size=900_000)
+        tprint(result, headers=['sentence_score', 'char_count', 'word_count'])
+
 
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
@@ -114,7 +117,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl)
-        result = tools.sentence_chunks(sentences, char_chunk_size=50, overlap=10)
+        result = tools.text_chunker(sentences, char_chunk_size=50, overlap=10)
         print(kn.table_report(result).to_string())
 
     def test_text_chunk_semantic(self):
@@ -136,7 +139,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl, embedding_name='all-mpnet-base-v2')
-        result = tools.sentence_chunks(sentences, char_chunk_size=100, temperature=0.9)
+        result = tools.text_chunker(sentences, char_chunk_size=100, temperature=0.9)
         print(kn.table_report(result).to_string())
 
     def test_embedding(self):
@@ -157,7 +160,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         sentences = tools.text_profiler(tbl)
-        chunks = tools.sentence_chunks(sentences)
+        chunks = tools.text_chunker(sentences)
         # save
         kn.save_persist_canonical(chunks)
         result = kn.load_persist_canonical(query='long wait')
@@ -180,8 +183,9 @@ def get_table():
     return pa.Table.from_arrays([n_legs, animals], names=names)
 
 
-def tprint(t: pa.table, headers: [str, list] = None, d_type: [str, list] = None, regex: [str, list] = None):
-    _ = Commons.filter_columns(t.slice(0, 10), headers=headers, d_types=d_type, regex=regex)
+def tprint(t: pa.table, top: int=None, headers: [str, list]=None, d_type: [str, list]=None, regex: [str, list]=None):
+    top = top if isinstance(top, int) else 10
+    _ = Commons.filter_columns(t.slice(0, top), headers=headers, d_types=d_type, regex=regex)
     print(Commons.table_report(_).to_string())
 
 

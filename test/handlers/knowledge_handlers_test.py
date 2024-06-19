@@ -10,7 +10,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from nn_rag.handlers.knowledge_handlers import KnowledgePersistHandler
-from nn_rag.handlers import ConnectorContract
+from ds_core.handlers.abstract_handlers import ConnectorContract
 from ds_core.properties.property_manager import PropertyManager
 
 # Pandas setup
@@ -73,7 +73,8 @@ class FeatureBuilderTest(unittest.TestCase):
         self.assertEqual(tbl.schema, result.schema)
 
     def test_pdf_https(self):
-        uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
+        # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
+        uri = 'https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf'
         cc = ConnectorContract(uri, 'module_name', 'handler')
         handler = KnowledgePersistHandler(cc)
         result = handler.load_canonical(file_type='pdf')

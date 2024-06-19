@@ -13,10 +13,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """This class represents RAG intent actions whereby data preparation can be done
     """
 
-    def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
-                            save_intent: bool=None, intent_order: int=None,
-                            intent_level: [int, str]=None, replace_intent: bool=None,
-                            remove_duplicates: bool=None) -> pa.Table:
+    def str_filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
+                                save_intent: bool=None, intent_order: int=None,
+                                intent_level: [int, str]=None, replace_intent: bool=None,
+                                remove_duplicates: bool=None) -> pa.Table:
         """ Takes the column name header from the canonical and applies the condition. Where the condition
         is satisfied within the column, the canonical row is removed.
 
@@ -62,9 +62,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
-    def sentence_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
-                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                         replace_intent: bool=None, remove_duplicates: bool=None):
+    def str_sentence_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
+                             save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                             replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a canonical of sentences from the text_profiler method or allows the given sentence indices
         to be removed.
 
@@ -107,10 +107,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         return pa.Table.from_pandas(df)
 
 
-    def pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
-                        max_replacements: int=None, to_header: str=None, save_intent: bool=None,
-                        intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                        remove_duplicates: bool=None):
+    def str_pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
+                            max_replacements: int=None, to_header: str=None, save_intent: bool=None,
+                            intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                            remove_duplicates: bool=None):
         """ For each string in header, replace non-overlapping substrings that match the given literal pattern
         with the given replacement. If max_replacements is given and not equal to -1, it limits the maximum
         amount replacements per input, counted from the left. Null values emit null.
@@ -160,9 +160,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def page_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
-                      save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                      replace_intent: bool=None, remove_duplicates: bool=None):
+    def text_page_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
         accompanying statistics to enable discovery.
 
@@ -220,15 +220,15 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
-        max_char_size = max_char_size if isinstance(max_char_size, int) else 2^19
+        max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         embedding_name = self._extract_value(embedding_name)
         embedding_model = SentenceTransformer(model_name_or_path=embedding_name) if embedding_name else None # 'all-mpnet-base-v2'
         nlp = English()
         nlp.add_pipe("sentencizer")
-        text = canonical.to_pylist()
-        sub_text = ''
+        text = canonical.column(header).to_pylist()
+        sub_text = []
         for item in text:
-            sub_text = [item[header][i:i + max_char_size] for i in range(0, len(item[header]), max_char_size)]
+            sub_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
         text = sub_text
         sents=[]
         for item in text:
@@ -247,12 +247,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 v1 = embedding_model.encode(s)
                 v2 = embedding_model.encode(sents[num+1])
                 sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
-
         return pa.Table.from_pylist(sentences)
 
-    def sentence_chunks(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
-                        overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
-                        intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
+    def text_chunker(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
+                     overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                     intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
