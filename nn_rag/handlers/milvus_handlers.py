@@ -45,7 +45,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._index_type = os.environ.get('MILVUS_INDEX_SIMILARITY_TYPE', _kwargs.pop('index_type', 'L2'))
         self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
-        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '32')))
+        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '96')))
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
         self._reference = _kwargs.pop('reference', 'general')
         self._collection_name = _kwargs.pop('collection', "default")
@@ -69,7 +69,11 @@ class MilvusSourceHandler(AbstractSourceHandler):
             # schema
             schema = self.pymilvus.CollectionSchema(fields=fields)
             # collection
-            self._collection = self.pymilvus.Collection(self._collection_name, schema)
+            self._collection = self.pymilvus.Collection(
+                name=self._collection_name,
+                schema=schema,
+                num_shards=2,
+                consistency_level='Strong')
             # index
             index_params = {
                 "metric_type": self._index_type,
