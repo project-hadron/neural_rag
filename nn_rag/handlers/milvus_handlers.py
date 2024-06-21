@@ -45,7 +45,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._index_type = os.environ.get('MILVUS_INDEX_SIMILARITY_TYPE', _kwargs.pop('index_type', 'L2'))
         self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
-        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '96')))
+        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '64')))
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
         self._reference = _kwargs.pop('reference', 'general')
         self._collection_name = _kwargs.pop('collection', "default")
