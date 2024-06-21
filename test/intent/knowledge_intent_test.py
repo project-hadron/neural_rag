@@ -80,21 +80,21 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_profiling_max(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
-        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-        #         'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-        #         'information. I can not use the customer portal. your customer portal is unhelpful')
-        # arr = pa.array([text], pa.string())
-        # tbl = pa.table([arr], names=['text'])
-        uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
-        tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
-        result =  tools.text_profiler(tbl, max_char_size=900_000)
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
+        # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
+        result =  tools.text_profiler(tbl, max_char_size=100)
         tprint(result, headers=['sentence_score', 'char_count', 'word_count'])
 
 
@@ -164,9 +164,10 @@ class KnowledgeIntentTest(unittest.TestCase):
         # save
         kn.save_persist_canonical(chunks)
         result = kn.load_persist_canonical(query='long wait')
-        kn.remove_canonical(kn.CONNECTOR_PERSIST)
-        result = kn.load_persist_canonical(query='long wait')
-        print(result)
+        print(kn.table_report(result).to_string())
+        # kn.remove_canonical(kn.CONNECTOR_PERSIST)
+        # result = kn.load_persist_canonical(query='long wait')
+        # print(kn.table_report(result).to_string())
 
     def test_raise(self):
         startTime = datetime.now()

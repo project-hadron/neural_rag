@@ -192,7 +192,7 @@ class AbstractCommonComponent(AbstractComponent):
         :param canonical: the table to view
         :param head: The number of rows to show.
         """
-        return Commons.table_report(canonical, head=head)
+        return Commons.table_report(canonical, top=head)
 
     def report_task(self, stylise: bool=True):
         """ generates a report on the source contract

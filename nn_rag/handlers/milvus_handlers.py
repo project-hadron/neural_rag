@@ -6,8 +6,6 @@ import pyarrow as pa
 
 __author__ = 'Darryl Oatridge'
 
-from nn_rag.components.commons import Commons
-
 
 class MilvusSourceHandler(AbstractSourceHandler):
     """ This handler class uses pymilvus package. Milvus is an open-source vector
@@ -16,13 +14,13 @@ class MilvusSourceHandler(AbstractSourceHandler):
     that require efficient handling of unstructured data.
 
         URI example
-            uri = "milvus://host:port/database?collection=<name>&partition=<name>"
+            uri = "milvus://host:port/database?collection=<name>&reference=<name>"
 
         params:
             collection: The name of the collection
-            partition: The name of the document partition
+            reference: a prefix name to reference the document vector
 
-        Environment Hyperparams:
+        Environment:
             MILVUS_EMBEDDING_NAME
             MILVUS_EMBEDDING_DEVICE
             MILVUS_EMBEDDING_BATCH_SIZE
@@ -49,7 +47,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
         self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '32')))
         self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
-        self._partition_name = _kwargs.pop('partition', 'general')
+        self._reference = _kwargs.pop('reference', 'general')
         self._collection_name = _kwargs.pop('collection', "default")
         # embedding model
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
@@ -64,8 +62,8 @@ class MilvusSourceHandler(AbstractSourceHandler):
             self._collection = self.pymilvus.Collection(self._collection_name)
         else:
             fields = [
-                self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.INT64, auto_id=False, is_primary=True),
-                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024, description='The source text'),
+                self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=64),
+                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024),
                 self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
             ]
             # schema
@@ -79,10 +77,6 @@ class MilvusSourceHandler(AbstractSourceHandler):
                 "params": {"nlist": self._index_clusters}
             }
             self._collection.create_index("embeddings", index_params)
-        # create partition
-        if not self._collection.has_partition(self._partition_name):
-            self._collection.create_partition(partition_name=self._partition_name, description=f'Partition for {self._partition_name}')
-        # stats
         self._changed_flag = True
 
     def supported_types(self) -> list:
@@ -120,26 +114,20 @@ class MilvusSourceHandler(AbstractSourceHandler):
         """
         if not isinstance(self.connector_contract, ConnectorContract):
             raise ValueError("The Connector Contract is not valid")
-        query = Commons.list_formatter(query)
-        expr = kwargs.get('expr', f"id like \"{str(self._partition_name)}_\"")
-        all_partitions = kwargs.get('all_partitions', False)
-        partitions = None if all_partitions else [self._partition_name]
+        expr = kwargs.get('expr', f"id like \"{str(self._reference)}_\"")
         # get collection
         if not self._collection:
             self._collection = self.pymilvus.Collection(self._collection_name)
         self._collection.load()
         # embedding
-        query_vector = []
-        for q in query:
-            query_vector.append([self._embedding_model.encode(q)])
+        query_vector = self._embedding_model.encode(query)
         # search
         params = {"metric_type": "L2", "params": {"nprobe": self._query_similarity}}
         results = self._collection.search(
-            data = query_vector,
+            data = [query_vector],
             anns_field = "embeddings",
             param = params,
             expr = expr,
-            partition_names = partitions,
             limit = self._search_limit,
             output_fields=["source"])
         self._collection.release()
@@ -166,14 +154,14 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         text_chunks = [item["chunk_text"] for item in chunks]
         embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
         data = [
-            [i for i in range(len(text_chunks))],
+            [f"{str(self._reference)}_{str(i)}" for i in range(len(text_chunks))],
             text_chunks,
             embeddings
         ]
         if not self._collection:
             self._collection = self.pymilvus.Collection(self._collection_name)
         self._collection.load()
-        self._collection.upsert(data=data, partition_name=self._partition_name)
+        self._collection.upsert(data=data)
         self._collection.release()
         return
 
@@ -182,9 +170,9 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         if self.pymilvus.utility.has_collection(self._collection_name):
             if not self._collection:
                 self._collection = self.pymilvus.Collection(self._collection_name)
+            expr = f"id like \"{str(self._reference)}_\""
             self._collection.load()
-            if self._collection.has_partition(self._partition_name):
-                self._collection.drop_partition(partition_name=self._partition_name)
+            self._collection.delete(expr)
             self._collection.release()
         return True
 
