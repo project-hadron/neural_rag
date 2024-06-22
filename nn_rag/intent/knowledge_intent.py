@@ -247,7 +247,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         """
         # intent persist options
         self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
-                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replac_savee_intent,
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
