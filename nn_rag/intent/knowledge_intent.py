@@ -203,7 +203,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             doc = nlp(item)
             for p in _gen_paragraphs(doc):
-                para.append(str(p).replace("\n", " ").strip())
+                para.append(str(p).strip())
         paragraphs = []
         for num, p in enumerate(para):
             paragraphs.append({'paragraph': p,
