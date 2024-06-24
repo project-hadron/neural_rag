@@ -55,10 +55,10 @@ class Commons(CoreCommons):
 
     @staticmethod
     def table_report(t: pa.Table, top: int=None, headers: [str, list]=None, d_type: [str, list]=None,
-                     regex: [str, list]=None, index_header: [str, list]=None, bold: [str, list]=None,
+                     regex: [str, list]=None, drop: bool=None, index_header: [str, list]=None, bold: [str, list]=None,
                      large_font: [str, list]=None):
         """ generates a stylised version of the pyarrow table """
         top = top if isinstance(top, int) else 10
-        report = Commons.filter_columns(t.slice(0, top), headers=headers, d_types=d_type, regex=regex)
+        report = Commons.filter_columns(t.slice(0, top), headers=headers, d_types=d_type, regex=regex, drop=drop)
         df = report.to_pandas()
         return Commons.report(df, index_header=index_header, bold=bold, large_font=large_font)

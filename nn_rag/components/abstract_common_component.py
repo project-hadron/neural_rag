@@ -187,7 +187,7 @@ class AbstractCommonComponent(AbstractComponent):
 
     @staticmethod
     def table_report(canonical: pa.Table, head: int=None, headers: [str, list]=None, d_type: [str, list]=None,
-                     regex: [str, list]=None):
+                     regex: [str, list]=None, drop: bool=None):
         """ Creates a report from a pyarrow table in a tabular form
 
         :param canonical: The pyarrow table
@@ -195,9 +195,10 @@ class AbstractCommonComponent(AbstractComponent):
         :param headers: (optional) a subset of headers to filter by
         :param d_type: (optional) The Data Type to filter by
         :param regex: (optional) a regular expression to filter by
+        :param drop: (optional) to reverse the selection. e.g. Drop the selected columns
         :return: a pandas stylized dataset
         """
-        return Commons.table_report(canonical, top=head, headers=headers, d_type=d_type, regex=regex)
+        return Commons.table_report(canonical, top=head, headers=headers, d_type=d_type, regex=regex, drop=drop)
 
     def report_task(self, stylise: bool=True):
         """ generates a report on the source contract
