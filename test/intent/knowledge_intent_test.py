@@ -74,7 +74,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_profiler(tbl)
+        result = tools.text_to_sentence(tbl)
         print(kn.table_report(result, head=5).to_string())
 
     def test_text_profiling_max(self):
@@ -94,7 +94,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
-        result =  tools.text_profiler(tbl, max_char_size=100)
+        result =  tools.text_to_sentence(tbl, max_char_size=100)
         tprint(result, headers=['sentence_score', 'char_count', 'word_count'])
 
 
@@ -116,7 +116,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_profiler(tbl)
+        sentences = tools.text_to_sentence(tbl)
         result = tools.text_chunker(sentences, char_chunk_size=50, overlap=10)
         print(kn.table_report(result).to_string())
 
@@ -138,7 +138,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_profiler(tbl, embedding_name='all-mpnet-base-v2')
+        sentences = tools.text_to_sentence(tbl, embedding_name='all-mpnet-base-v2')
         result = tools.text_chunker(sentences, char_chunk_size=100, temperature=0.9)
         print(kn.table_report(result).to_string())
 
@@ -159,7 +159,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_profiler(tbl)
+        sentences = tools.text_to_sentence(tbl)
         chunks = tools.text_chunker(sentences)
         # save
         kn.save_persist_canonical(chunks)

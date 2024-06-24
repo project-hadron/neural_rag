@@ -160,9 +160,64 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_profiler(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
-                      save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                      replace_intent: bool=None, remove_duplicates: bool=None):
+    def text_to_paragraph(self, canonical: pa.Table, header: str = None,
+                          save_intent: bool = None, intent_level: [int, str] = None, intent_order: int = None,
+                          replace_intent: bool = None, remove_duplicates: bool = None):
+        """
+
+        :param canonical: a Table with a text column
+        :param header: (optional) The name of the target text column, default 'text'
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent persist options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # remove intent params
+
+        def _gen_paragraphs(document):
+            start = 0
+            for token in document:
+                if token.is_space and token.text.count("\n") > 1:
+                    yield document[start:token.i]
+                    start = token.i
+            yield document[start:]
+
+        canonical = self._get_canonical(canonical)
+        header = self._extract_value(header)
+        header = header if isinstance(header, str) else 'text'
+        text = canonical.column(header).to_pylist()
+        nlp = English()
+        para = []
+        for item in text:
+            doc = nlp(item)
+            for p in _gen_paragraphs(doc):
+                para.append(str(p).replace("\n", " ").strip())
+        paragraphs = []
+        for num, p in enumerate(para):
+            paragraphs.append({'paragraph': p,
+                              'paragraph_num': num,
+                              "char_count": len(p),
+                              "word_count": len(p.split(" ")),
+                              "sentence_count_raw": len(text.split(". ")),
+                              "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                              })
+        return pa.Table.from_pylist(paragraphs)
+
+    def text_to_sentence(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
+                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                         replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
         accompanying statistics to enable discovery.
 
