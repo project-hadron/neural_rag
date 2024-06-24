@@ -186,13 +186,18 @@ class AbstractCommonComponent(AbstractComponent):
         return DataDiscovery.data_schema(canonical=tbl, table_cast=table_cast, stylise=stylise)
 
     @staticmethod
-    def table_report(canonical: pa.Table, head: int=None):
+    def table_report(canonical: pa.Table, head: int=None, headers: [str, list]=None, d_type: [str, list]=None,
+                     regex: [str, list]=None):
         """ Creates a report from a pyarrow table in a tabular form
 
-        :param canonical: the table to view
-        :param head: The number of rows to show.
+        :param canonical: The pyarrow table
+        :param head: (optional) the number of rows to display
+        :param headers: (optional) a subset of headers to filter by
+        :param d_type: (optional) The Data Type to filter by
+        :param regex: (optional) a regular expression to filter by
+        :return: a pandas stylized dataset
         """
-        return Commons.table_report(canonical, top=head)
+        return Commons.table_report(canonical, top=head, headers=headers, d_type=d_type, regex=regex)
 
     def report_task(self, stylise: bool=True):
         """ generates a report on the source contract
