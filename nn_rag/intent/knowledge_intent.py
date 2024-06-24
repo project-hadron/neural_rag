@@ -210,7 +210,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                               'paragraph_num': num,
                               "char_count": len(p),
                               "word_count": len(p.split(" ")),
-                              "sentence_count_raw": len(text.split(". ")),
+                              "sentence_count_raw": len(p.split(". ")),
                               "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
                               })
         return pa.Table.from_pylist(paragraphs)
