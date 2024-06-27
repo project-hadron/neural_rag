@@ -58,8 +58,25 @@ class KnowledgeIntentTest(unittest.TestCase):
             shutil.rmtree('working')
         except OSError:
             pass
+    def test_text_to_paragraph(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.\n\n'
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor.\n\n No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions.\n\n'
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly.\n\n'
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl)
+        print(kn.table_report(result, head=5).to_string())
 
-    def test_text_profiling(self):
+    def test_text_to_sentence(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -74,10 +91,10 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_sentence(tbl)
+        result = tools.text_to_sentences(tbl)
         print(kn.table_report(result, head=5).to_string())
 
-    def test_text_profiling_max(self):
+    def test_text_to_sentence_max(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
@@ -94,7 +111,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
-        result =  tools.text_to_sentence(tbl, max_char_size=100)
+        result =  tools.text_to_sentences(tbl, max_char_size=100)
         tprint(result, headers=['sentence_score', 'char_count', 'word_count'])
 
 
@@ -116,8 +133,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentence(tbl)
-        result = tools.text_chunker(sentences, char_chunk_size=50, overlap=10)
+        sentences = tools.text_to_sentences(tbl)
+        result = tools.text_to_chunks(sentences, char_chunk_size=50, overlap=10)
         print(kn.table_report(result).to_string())
 
     def test_text_chunk_semantic(self):
@@ -138,8 +155,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentence(tbl, embedding_name='all-mpnet-base-v2')
-        result = tools.text_chunker(sentences, char_chunk_size=100, temperature=0.9)
+        sentences = tools.text_to_sentences(tbl, embedding_name='all-mpnet-base-v2')
+        result = tools.text_to_chunks(sentences, char_chunk_size=100, temperature=0.9)
         print(kn.table_report(result).to_string())
 
     def test_embedding(self):
@@ -159,8 +176,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentence(tbl)
-        chunks = tools.text_chunker(sentences)
+        sentences = tools.text_to_sentences(tbl)
+        chunks = tools.text_to_chunks(sentences)
         # save
         kn.save_persist_canonical(chunks)
         result = kn.load_persist_canonical(query='long wait')

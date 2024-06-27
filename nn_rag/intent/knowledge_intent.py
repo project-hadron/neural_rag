@@ -3,8 +3,9 @@ import re
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
-from sentence_transformers import SentenceTransformer, util
+import spacy
 from spacy.lang.en import English
+from spacy.language import Language
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 
@@ -62,7 +63,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
-    def str_sentence_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
+    def str_indicies_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
                              save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                              replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a canonical of sentences from the text_profiler method or allows the given sentence indices
@@ -105,7 +106,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         df = pd.DataFrame(sentences)
         df = df.drop(index=drop_list)
         return pa.Table.from_pandas(df)
-
 
     def str_pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
                             max_replacements: int=None, to_header: str=None, save_intent: bool=None,
@@ -160,13 +160,16 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_to_paragraph(self, canonical: pa.Table, header: str = None,
-                          save_intent: bool = None, intent_level: [int, str] = None, intent_order: int = None,
-                          replace_intent: bool = None, remove_duplicates: bool = None):
-        """
+    def text_to_paragraphs(self, canonical: pa.Table, sep: str=None, header: str=None, max_char_size: int=None,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None):
+        """ Takes a table with the text column and split it into perceived paragraphs. This method
+        is generally used for text discovery and manipulation before chunking.
 
         :param canonical: a Table with a text column
+        :param sep: (optional) The separator patter for the paragraphs
         :param header: (optional) The name of the target text column, default 'text'
+        :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -186,44 +189,56 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
 
-        def _gen_paragraphs(document):
-            start = 0
-            for token in document:
-                if token.is_space and token.text.count("\n") > 1:
-                    yield document[start:token.i]
-                    start = token.i
-            yield document[start:]
+        @Language.component("custom_sentencizer")
+        def custom_sentencizer(document):
+            for i, token in enumerate(document[:-2]):
+                # Define sentence start if pipe + titlecase token
+                if token.text == "|" and document[i + 1].is_title:
+                    document[i + 1].is_sent_start = True
+                else:
+                    # Explicitly set sentence start to False otherwise, to tell
+                    # the parser to leave those tokens alone
+                    document[i + 1].is_sent_start = False
+            return document
 
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
+        sep = self._extract_value(sep)
+        sep = sep if isinstance(sep, str) else '\n\n'
+        max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         text = canonical.column(header).to_pylist()
-        nlp = English()
-        para = []
+        # load English parser
+        nlp = spacy.load("en_core_web_sm")
+        nlp.add_pipe("custom_sentencizer", before="parser")
+        sub_text = []
+        for item in text:
+            sub_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
+        text = [x.replace(sep, ' | ') for x in sub_text]
+        sent_para = []
         for item in text:
             doc = nlp(item)
-            for p in _gen_paragraphs(doc):
-                para.append(str(p).strip())
+            for sent in doc.sents:
+                sent_para.append(str(sent.text).replace('. |', '.').strip())
         paragraphs = []
-        for num, p in enumerate(para):
-            paragraphs.append({'paragraph': p,
-                              'paragraph_num': num,
+        for num, p in enumerate(sent_para):
+            paragraphs.append({'paragraph_num': num,
                               "char_count": len(p),
                               "word_count": len(p.split(" ")),
                               "sentence_count_raw": len(p.split(". ")),
                               "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                              'paragraph': p,
                               })
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentence(self, canonical: pa.Table, header: str=None, embedding_name: str=None, max_char_size: int=None,
-                         save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                         replace_intent: bool=None, remove_duplicates: bool=None):
-        """ Taking a Table with a text column, returning the profile of that text as a list of sentences with
-        accompanying statistics to enable discovery.
+    def text_to_sentences(self, canonical: pa.Table, header: str=None, max_char_size: int=None, save_intent: bool=None,
+                          intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                          remove_duplicates: bool=None):
+        """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
+        is generally used for text discovery and manipulation before chunking.
 
         :param canonical: a Table with a text column
         :param header: (optional) The name of the target text column, default 'text'
-        :param embedding_name: (optional) the name of the embedding model to use to score familiarity
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -247,8 +262,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        embedding_name = self._extract_value(embedding_name)
-        embedding_model = SentenceTransformer(model_name_or_path=embedding_name) if embedding_name else None # 'all-mpnet-base-v2'
         nlp = English()
         nlp.add_pipe("sentencizer")
         text = canonical.column(header).to_pylist()
@@ -263,21 +276,16 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sentences = []
         for num, s in enumerate(sents):
             sentences.append({'sentence': s,
-                              'sentence_score': 0,
                               'sentence_num': num,
                               "char_count": len(s),
                               "word_count": len(s.split(" ")),
                               "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
                               })
-            if embedding_name and num < len(sents)-1:
-                v1 = embedding_model.encode(s)
-                v2 = embedding_model.encode(sents[num+1])
-                sentences[num]['sentence_score'] = util.dot_score(v1, v2)[0, 0].tolist()
         return pa.Table.from_pylist(sentences)
 
-    def text_chunker(self, canonical: pa.Table, char_chunk_size: int=None, temperature: float=None,
-                     overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
-                     intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None,
+                       overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                       intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
@@ -285,8 +293,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a text profile Table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
-        :param temperature: (optional) a value between 0 and 1 representing the temperature between sentences
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
+        :param header: (optional) The name of the target text column, default 'text'
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -310,53 +318,38 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
         overlap = self._extract_value(overlap)
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
-        temperature = self._extract_value(temperature)
-        temperature = temperature if isinstance(temperature, float) else 1
-        nlp = English()
-        nlp.add_pipe("sentencizer")
-        sentences = canonical.to_pylist()
-        if 1 > temperature > 0:
-            # sort by score
-            parsed_sentence = [sentences[0]["sentence"]]
-            score = sentences[0]["sentence_score"]
-            for item in sentences[1:]:
-                if score > temperature:
-                    if len(parsed_sentence[-1]) + item['char_count'] > char_chunk_size:
-                        previous = parsed_sentence.pop()
-                        *first, last = previous.split('. ')
-                        first = [item + '.' for item in first]
-                        parsed_sentence.append(first)
-                        parsed_sentence.append(last + " " + item["sentence"])
-                    else:
-                        parsed_sentence[-1] += " " + item["sentence"]
-                elif len(parsed_sentence[-1]) + item['char_count'] < char_chunk_size:
-                    if score <= temperature:
-                        parsed_sentence[-1] += " " + item["sentence"]
-                else:
-                    parsed_sentence.append(item["sentence"])
-                score = item['sentence_score']
-        else:
-            # text
-            parsed_sentence = ''
-            for item in sentences:
-                parsed_sentence += " " + item['sentence']
-            parsed_sentence = [parsed_sentence.strip()]
-        # chunks
+        header = self._extract_value(header)
+        header = header if isinstance(header, str) else 'text'
+        text = canonical.column(header).to_pylist()
         chunks = []
-        for sentence in parsed_sentence:
-            while len(sentence) > 0:
-                sentence_chunk = sentence[:char_chunk_size + overlap]
-                sentence = sentence[char_chunk_size:]
+        for item in text:
+            while len(item) > 0:
+                text_chunk = item[:char_chunk_size + overlap]
+                item = item[char_chunk_size:]
                 chunk_dict = {}
                 # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
-                joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
-                joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
-                chunk_dict["chunk_text"] = joined_sentence_chunk
+                joined_text_chunk = "".join(text_chunk).replace("  ", " ").strip()
+                joined_text_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_text_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
+                chunk_dict["chunk_text"] = joined_text_chunk
 
                 # Get stats about the chunk
-                chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
-                chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
-                chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4  # 1 token = ~4 characters
+                chunk_dict["chunk_char_count"] = len(joined_text_chunk)
+                chunk_dict["chunk_word_count"] = len([word for word in joined_text_chunk.split(" ")])
+                chunk_dict["chunk_token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
 
                 chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
+
+    #  ---------
+    #   Private
+    #  ---------
+
+    def _template(self, canonical: pa.Table,
+                  save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                  replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """"""
+        # intent recipie options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # code block
