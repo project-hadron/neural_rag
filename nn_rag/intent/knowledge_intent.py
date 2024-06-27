@@ -219,15 +219,15 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             doc = nlp(item)
             for sent in doc.sents:
-                sent_para.append(str(sent.text).replace('. |', '.').strip())
+                sent_para.append(str(sent.text).replace(' |', '').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in enumerate(sent_para):
             paragraphs.append({'paragraph_num': num,
-                              "char_count": len(p),
-                              "word_count": len(p.split(" ")),
-                              "sentence_count_raw": len(p.split(". ")),
-                              "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
-                              'paragraph': p,
+                               "char_count": len(p),
+                               "word_count": len(p.split(" ")),
+                               "sentence_count_raw": len(p.split(". ")),
+                               "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                               'paragraph': p,
                               })
         return pa.Table.from_pylist(paragraphs)
 
@@ -275,11 +275,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
         sentences = []
         for num, s in enumerate(sents):
-            sentences.append({'sentence': s,
-                              'sentence_num': num,
+            sentences.append({'sentence_num': num,
                               "char_count": len(s),
                               "word_count": len(s.split(" ")),
                               "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                              'sentence': s,
                               })
         return pa.Table.from_pylist(sentences)
 
@@ -330,13 +330,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
                 joined_text_chunk = "".join(text_chunk).replace("  ", " ").strip()
                 joined_text_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_text_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
-                chunk_dict["chunk_text"] = joined_text_chunk
-
                 # Get stats about the chunk
                 chunk_dict["chunk_char_count"] = len(joined_text_chunk)
                 chunk_dict["chunk_word_count"] = len([word for word in joined_text_chunk.split(" ")])
                 chunk_dict["chunk_token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
-
+                chunk_dict["chunk_text"] = joined_text_chunk
                 chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
 
