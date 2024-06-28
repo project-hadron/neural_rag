@@ -243,12 +243,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 sent_para.append(str(sent.text).replace(' |', '.').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in enumerate(sent_para):
-            paragraphs.append({"paragraph_char_count": len(p),
-                               "paragraph_word_count": len(p.split(" ")),
-                               "paragraph_sentence_count": len(p.split(". ")),
-                               "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
-                               'text': p,
-                              })
+            paragraphs.append({
+                "index": num,
+                "paragraph_char_count": len(p),
+                "paragraph_word_count": len(p.split(" ")),
+                "paragraph_sentence_count": len(p.split(". ")),
+                "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                'text': p,
+            })
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, header: str=None, max_char_size: int=None, save_intent: bool=None,
@@ -295,11 +297,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
         sentences = []
         for num, s in enumerate(sents):
-            sentences.append({"sentence_char_count": len(s),
-                              "sentence_word_count": len(s.split(" ")),
-                              "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
-                              'text': s,
-                              })
+            sentences.append({
+                "index": num,
+                "sentence_char_count": len(s),
+                "sentence_word_count": len(s.split(" ")),
+                "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                'text': s,
+            })
         return pa.Table.from_pylist(sentences)
 
     def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None, overlap: int=None,

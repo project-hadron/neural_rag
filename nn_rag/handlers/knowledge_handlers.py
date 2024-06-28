@@ -52,7 +52,9 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 with open(address) as f:
                     doc = f.read()
             text = doc.encode().decode()
-            return pa.table([pa.array([text], pa.string())], names=['text'])
+            t_array = pa.array([text], pa.string())
+            i_array = pa.array([range(len(text)), pa.int32()])
+            return pa.table([i_array, t_array], names=['index', 'text'])
         # pdf
         if file_type.lower() in ['pdf']:
             if _cc.schema.startswith('http'):
@@ -64,7 +66,9 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 with fitz.open(address) as doc:  # open document
                     doc = chr(12).join([page.get_text() for page in doc])
             text = doc.encode().decode()
-            return pa.table([pa.array([text], pa.string())], names=['text'])
+            t_array = pa.array([text], pa.string())
+            i_array = pa.array([range(len(text)), pa.int32()])
+            return pa.table([i_array, t_array], names=['index', 'text'])
         raise LookupError('The source format {} is not currently supported'.format(file_type))
 
     def exists(self) -> bool:
