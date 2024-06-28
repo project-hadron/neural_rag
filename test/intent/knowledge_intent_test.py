@@ -58,6 +58,34 @@ class KnowledgeIntentTest(unittest.TestCase):
             shutil.rmtree('working')
         except OSError:
             pass
+
+    def test_str_remove_text_index(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
+                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.'
+                'You did not understand my needs.\n\nI have been mis-sold. My details are not accurate.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl)
+        print(kn.table_report(result, head=5).to_string())
+        result = tools.str_remove_text(result, indices=[0, (2,7)])
+        print(kn.table_report(result, head=5).to_string())
+
+    def test_str_remove_text_pattern(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
+                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.'
+                'You did not understand my needs.\n\nI have been mis-sold. My details are not accurate.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl)
+        print(kn.table_report(result, head=5).to_string())
+        result = tools.str_remove_text(result, pattern='^You.*(You|Unhappy)')
+        print(kn.table_report(result, head=5).to_string())
+
+
     def test_text_to_paragraph(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools

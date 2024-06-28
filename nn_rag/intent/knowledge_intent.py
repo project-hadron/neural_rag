@@ -15,9 +15,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """
 
     def str_filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
-                                save_intent: bool=None, intent_order: int=None,
-                                intent_level: [int, str]=None, replace_intent: bool=None,
-                                remove_duplicates: bool=None) -> pa.Table:
+                                save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
+                                replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes the column name header from the canonical and applies the condition. Where the condition
         is satisfied within the column, the canonical row is removed.
 
@@ -63,18 +62,23 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
-    def str_indicies_removal(self, canonical: pa.Table, indices:list=None, to_header: str=None,
-                             save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                             replace_intent: bool=None, remove_duplicates: bool=None):
-        """ Taking a canonical of sentences from the text_profiler method or allows the given sentence indices
-        to be removed.
+    def str_remove_text(self, canonical: pa.Table, indices: list=None, pattern: str=None, to_header: str=None,
+                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                        replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """ Taking a canonical with a text column and removes based on either a regex
+        pattern or list of index.
 
-        'indices' takes a list of either sentence_num, representing the sentence to be removed, or a tuple of start add stop
-        range of sentence numbers. For example [1, 3, (5, 8)] would remove the sentences [1, 3, 5, 6, 7]
+        'indices' takes a list of index to be removed, or/and tuples of start add stop
+        range of index numbers. For example [1, 3, (5, 8)] would remove the index
+        [1, 3, 5, 6, 7].
 
+        'pattern' takes a regex str to find within the text from which that row is
+        removed. For example '^Do Not Use Without Permission' would remove rows
+        where the text starts with that string.
 
         :param canonical: a Table of sentences and stats
         :param indices: (optional) a list of numbers and/or tuples for sentences to be dropped
+        :param pattern: (optional) a regex expression pattern to remove an element
         :param to_header: (optional) an optional name to call the column
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -96,21 +100,38 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         indices = Commons.list_formatter(indices)
-        sentences = canonical.to_pylist()
-        drop_list = []
-        for x in indices:
-            if isinstance(x, tuple):
-                drop_list += (list(range(x[0], x[1])))
-            else:
-                drop_list += [x]
-        df = pd.DataFrame(sentences)
-        df = df.drop(index=drop_list)
-        return pa.Table.from_pandas(df)
+        # by pattern
+        if pattern:
+            # Get the specified column
+            column = canonical['text']
+            # Compute the regex match for each element in the column
+            matches = pc.match_substring_regex(column, pattern)
+            # Find the indices where the pattern matches
+            indices = [i for i, match in enumerate(matches) if match.as_py()]
+        # by indices
+        if indices:
+            index_list = []
+            # expand the indices
+            for item in indices:
+                if isinstance(item, tuple) and len(item) == 2:
+                    start, end = item
+                    index_list.extend(range(start, end))
+                else:
+                    index_list.append(item)
+            indices = sorted(list(set(index_list)), reverse=True)
+            # Convert the table to a list of rows
+            table_as_list = canonical.to_pydict()
+            # Create a new dictionary excluding the specified indices
+            filtered_dict = {key: [value for i, value in enumerate(column) if i not in indices]
+                             for key, column in table_as_list.items()}
+            # Convert the filtered dictionary back to an Arrow table
+            return pa.table(filtered_dict)
+        return canonical
 
     def str_pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
                             max_replacements: int=None, to_header: str=None, save_intent: bool=None,
                             intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                            remove_duplicates: bool=None):
+                            remove_duplicates: bool=None) -> pa.Table:
         """ For each string in header, replace non-overlapping substrings that match the given literal pattern
         with the given replacement. If max_replacements is given and not equal to -1, it limits the maximum
         amount replacements per input, counted from the left. Null values emit null.
@@ -162,7 +183,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
     def text_to_paragraphs(self, canonical: pa.Table, sep: str=None, header: str=None, max_char_size: int=None,
                            save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                           replace_intent: bool=None, remove_duplicates: bool=None):
+                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -219,21 +240,20 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             doc = nlp(item)
             for sent in doc.sents:
-                sent_para.append(str(sent.text).replace(' |', '').replace('\n', ' ').strip())
+                sent_para.append(str(sent.text).replace(' |', '.').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in enumerate(sent_para):
-            paragraphs.append({'paragraph_num': num,
-                               "char_count": len(p),
-                               "word_count": len(p.split(" ")),
-                               "sentence_count_raw": len(p.split(". ")),
-                               "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
-                               'paragraph': p,
+            paragraphs.append({"paragraph_char_count": len(p),
+                               "paragraph_word_count": len(p.split(" ")),
+                               "paragraph_sentence_count": len(p.split(". ")),
+                               "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                               'text': p,
                               })
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, header: str=None, max_char_size: int=None, save_intent: bool=None,
                           intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                          remove_duplicates: bool=None):
+                          remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -275,17 +295,16 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
         sentences = []
         for num, s in enumerate(sents):
-            sentences.append({'sentence_num': num,
-                              "char_count": len(s),
-                              "word_count": len(s.split(" ")),
-                              "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
-                              'sentence': s,
+            sentences.append({"sentence_char_count": len(s),
+                              "sentence_word_count": len(s.split(" ")),
+                              "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                              'text': s,
                               })
         return pa.Table.from_pylist(sentences)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None,
-                       overlap: int=None, save_intent: bool=None, intent_level: [int, str]=None,
-                       intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None):
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None, overlap: int=None,
+                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                       replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
@@ -334,7 +353,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 chunk_dict["chunk_char_count"] = len(joined_text_chunk)
                 chunk_dict["chunk_word_count"] = len([word for word in joined_text_chunk.split(" ")])
                 chunk_dict["chunk_token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
-                chunk_dict["chunk_text"] = joined_text_chunk
+                chunk_dict["text"] = joined_text_chunk
                 chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
 

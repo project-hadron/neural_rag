@@ -39,16 +39,11 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
             address = _cc.address
             file_type = load_params.pop('file_type', _ext if len(_ext) > 0 else 'txt')
         self.reset_changed()
-        # tensor
-        if file_type.lower() in ['embedding']:
-            with pa.OSFile(address, 'rb') as source:
-                pa_tensor = pa.ipc.read_tensor(source)
-            return pa_tensor
         # parquet
         if file_type.lower() in ['parquet']:
             if _cc.schema.startswith('http'):
                 address = io.BytesIO(requests.get(address).content)
-            return pq.read_table(address, **load_params)
+            pq.read_table(address, **load_params)
         # txt
         if file_type.lower() in ['txt']:
             if _cc.schema.startswith('http'):
@@ -152,10 +147,6 @@ class KnowledgePersistHandler(KnowledgeSourceHandler, AbstractPersistHandler):
         # parquet
         if file_type.lower() in ['pq', 'parquet']:
             pq.write_table(canonical, _address, **write_params)
-            return True
-        if file_type.lower() in ['embedding']:
-            with pa.OSFile(uri, 'wb') as sink:
-                pa.ipc.write_tensor(canonical, sink)
             return True
         # not found
         raise LookupError('The file format {} is not currently supported for write'.format(file_type))
