@@ -1,4 +1,6 @@
 import io
+
+import numpy as np
 import requests
 import os
 import pyarrow as pa
@@ -53,7 +55,7 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                     doc = f.read()
             text = doc.encode().decode()
             t_array = pa.array([text], pa.string())
-            i_array = pa.array([range(len(text)), pa.int32()])
+            i_array = pa.array([int(x) for x in range(len(t_array))])
             return pa.table([i_array, t_array], names=['index', 'text'])
         # pdf
         if file_type.lower() in ['pdf']:
@@ -67,7 +69,7 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                     doc = chr(12).join([page.get_text() for page in doc])
             text = doc.encode().decode()
             t_array = pa.array([text], pa.string())
-            i_array = pa.array([range(len(text)), pa.int32()])
+            i_array = pa.array([int(x) for x in range(len(t_array))])
             return pa.table([i_array, t_array], names=['index', 'text'])
         raise LookupError('The source format {} is not currently supported'.format(file_type))
 
