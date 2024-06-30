@@ -47,6 +47,13 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 address = io.BytesIO(requests.get(address).content)
             pq.read_table(address, **load_params)
         # txt
+        # else:
+        #     try:
+        #
+        #     except:
+        #         raise LookupError('The source format {} is not currently supported'.format(file_type))
+        #
+        #
         if file_type.lower() in ['txt']:
             if _cc.schema.startswith('http'):
                 doc = requests.get(address).text

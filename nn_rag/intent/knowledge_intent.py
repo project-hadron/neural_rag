@@ -1,10 +1,11 @@
+import ast
 import inspect
 import re
-import pandas as pd
+from collections import Counter
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
-from spacy.lang.en import English
+from sentence_transformers import SentenceTransformer, util
 from spacy.language import Language
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
@@ -125,7 +126,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             filtered_dict = {key: [value for i, value in enumerate(column) if i not in indices]
                              for key, column in table_as_list.items()}
             # Convert the filtered dictionary back to an Arrow table
-            return pa.table(filtered_dict)
+            tbl = pa.table(filtered_dict)
+            # reset the index
+            t2 = pa.table([pa.array([int(x) for x in range(tbl.num_rows)])], names=['index'])
+            return Commons.table_append(tbl, t2)
         return canonical
 
     def str_pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
@@ -181,9 +185,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         to_header = to_header if isinstance(to_header, str) else header
         return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
 
-    def text_to_paragraphs(self, canonical: pa.Table, sep: str=None, header: str=None, max_char_size: int=None,
-                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def text_to_paragraphs(self, canonical: pa.Table, top_words: int=None, threshold_words: int=None,
+                           top_nouns: int=None, threshold_nouns: int=None, sep: str=None, header: str=None,
+                           max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -225,6 +230,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
+        top_words = top_words if isinstance(top_words, int) else 4
+        top_nouns = top_nouns if isinstance(top_nouns, int) else 4
+        threshold_words = threshold_words if isinstance(threshold_words, int) else 1
+        threshold_nouns = threshold_nouns if isinstance(threshold_nouns, int) else 1
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
@@ -243,14 +252,47 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 sent_para.append(str(sent.text).replace(' |', '.').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in enumerate(sent_para):
+            words_freq = {}
+            doc = nlp(p)
+            words = [token.text for token in doc
+                     if not token.is_stop and
+                     not token.is_punct and
+                     not token.is_space and
+                     not token.text in ['●']]
+            common_words = Counter(words).most_common(top_words)
+            words_freq = [k for k, c in common_words if c >= threshold_words]
+
+            nouns = [token.text
+                     for token in doc
+                     if (not token.is_stop and
+                         not token.is_punct and
+                         not token.is_space and
+                         not token.text in ['●'] and
+                         token.pos_ == "NOUN")]
+            common_nouns = Counter(nouns).most_common(top_nouns)
+            nouns_freq = [k for k, c in common_nouns if c >= threshold_nouns]
+
             paragraphs.append({
                 "index": num,
                 "paragraph_char_count": len(p),
                 "paragraph_word_count": len(p.split(" ")),
                 "paragraph_sentence_count": len(p.split(". ")),
                 "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                "paragraph_score": 0,
+                "paragraph_words": words_freq,
+                "paragraph_nouns" : nouns_freq,
                 'text': p,
             })
+        # set embedding
+        embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
+        for num, item in enumerate(paragraphs):
+            if num >= len(paragraphs) -1:
+                break
+            if not item['paragraph_nouns']:
+                continue
+            v1 = embedding_model.encode(' '.join(item['paragraph_nouns']))
+            v2 = embedding_model.encode(paragraphs[num+1]['text'])
+            paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, header: str=None, max_char_size: int=None, save_intent: bool=None,
@@ -284,7 +326,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = self._extract_value(header)
         header = header if isinstance(header, str) else 'text'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        nlp = English()
+        # SpaCy
+        nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("sentencizer")
         text = canonical.column(header).to_pylist()
         sub_text = []
@@ -297,13 +340,27 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
         sentences = []
         for num, s in enumerate(sents):
+            doc = nlp(s)
+            chunks = [token.text for token in doc.noun_chunks]
             sentences.append({
                 "index": num,
                 "sentence_char_count": len(s),
                 "sentence_word_count": len(s.split(" ")),
                 "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                'sentence_score': 0,
+                "sentence_noun_chunks": chunks,
                 'text': s,
             })
+        # set embedding
+        embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
+        for num, item in enumerate(sentences):
+            if num >= len(sentences) -1:
+                break
+            if not item['text']:
+                continue
+            v1 = embedding_model.encode(item['text'])
+            v2 = embedding_model.encode(sentences[num+1]['text'])
+            sentences[num]['sentence_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
     def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None, overlap: int=None,
