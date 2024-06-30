@@ -89,18 +89,20 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_to_paragraph(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.\n\n'
-                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-                'not keep me updated. Incorrect information given. The performance of my product was poor.\n\n No reply '
-                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions.\n\n'
-                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly.\n\n'
-                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-                'information. I can not use the customer portal. your customer portal is unhelpful.')
-        arr = pa.array([text], pa.string())
-        tbl = pa.table([arr], names=['text'])
+        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        tbl = kn.set_source_uri(uri).load_source_canonical()
+        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.\n\n'
+        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+        #         'not keep me updated. Incorrect information given. The performance of my product was poor.\n\n No reply '
+        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions.\n\n'
+        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly.\n\n'
+        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+        #         'information. I can not use the customer portal. your customer portal is unhelpful.')
+        # arr = pa.array([text], pa.string())
+        # tbl = pa.table([arr], names=['text'])
         result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result, head=5).to_string())
 
@@ -146,23 +148,23 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_chunk(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        # uri = "https://www.europarl.europa.eu/doceo/document/TA-9-2024-0138_EN.pdf"
-        # kn.set_source_uri(uri)
-        # tbl = kn.load_source_canonical(file_type='pdf')
-        text = ('You took too long. You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-                'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr = pa.array([text], pa.string())
-        tbl = pa.table([arr], names=['text'])
+        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        kn.set_source_uri(uri)
+        tbl = kn.load_source_canonical(file_type='pdf')
+        # text = ('You took too long. You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+        #         'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+        #         'information. I can not use the customer portal. your customer portal is unhelpful')
+        # arr = pa.array([text], pa.string())
+        # tbl = pa.table([arr], names=['text'])
         sentences = tools.text_to_sentences(tbl)
-        result = tools.text_to_chunks(sentences, char_chunk_size=50, overlap=10)
+        result = tools.text_to_chunks(sentences, char_chunk_size=500, overlap=10)
         print(kn.table_report(result).to_string())
 
     def test_text_chunk_semantic(self):
@@ -183,8 +185,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentences(tbl, embedding_name='all-mpnet-base-v2')
-        result = tools.text_to_chunks(sentences, char_chunk_size=100, temperature=0.9)
+        sentences = tools.text_to_sentences(tbl)
+        result = tools.text_to_chunks(sentences, char_chunk_size=100)
         print(kn.table_report(result).to_string())
 
     def test_embedding(self):

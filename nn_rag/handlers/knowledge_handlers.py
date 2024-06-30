@@ -33,52 +33,35 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
         load_params = kwargs
         load_params.update(_cc.kwargs)  # Update with any kwargs in the Connector Contract
         if load_params.get('file_type', False):
-            file_type = load_params.pop('file_type', 'txt')
+            file_type = load_params.pop('file_type', 'pdf')
             address = _cc.uri
         else:
             load_params.update(_cc.query)  # Update kwargs with those in the uri query
             _, _, _ext = _cc.address.rpartition('.')
             address = _cc.address
-            file_type = load_params.pop('file_type', _ext if len(_ext) > 0 else 'txt')
+            file_type = load_params.pop('file_type', _ext if len(_ext) > 0 else 'pdf')
         self.reset_changed()
         # parquet
         if file_type.lower() in ['parquet']:
             if _cc.schema.startswith('http'):
                 address = io.BytesIO(requests.get(address).content)
-            pq.read_table(address, **load_params)
-        # txt
-        # else:
-        #     try:
-        #
-        #     except:
-        #         raise LookupError('The source format {} is not currently supported'.format(file_type))
-        #
-        #
-        if file_type.lower() in ['txt']:
-            if _cc.schema.startswith('http'):
-                doc = requests.get(address).text
-            else:
-                with open(address) as f:
-                    doc = f.read()
-            text = doc.encode().decode()
-            t_array = pa.array([text], pa.string())
-            i_array = pa.array([int(x) for x in range(len(t_array))])
-            return pa.table([i_array, t_array], names=['index', 'text'])
-        # pdf
-        if file_type.lower() in ['pdf']:
+            return pq.read_table(address, **load_params)
+        # pymupdf
+        try:
             if _cc.schema.startswith('http'):
                 request = requests.get(address)
                 filestream = io.BytesIO(request.content)
-                with fitz.open(stream=filestream, filetype="pdf") as doc:
+                with fitz.open(stream=filestream, filetype=file_type) as doc:
                     doc = chr(12).join([page.get_text() for page in doc])
             else:
                 with fitz.open(address) as doc:  # open document
                     doc = chr(12).join([page.get_text() for page in doc])
-            text = doc.encode().decode()
-            t_array = pa.array([text], pa.string())
-            i_array = pa.array([int(x) for x in range(len(t_array))])
-            return pa.table([i_array, t_array], names=['index', 'text'])
-        raise LookupError('The source format {} is not currently supported'.format(file_type))
+        except:
+            raise LookupError('The source format {} is not currently supported'.format(file_type))
+        text = doc.encode().decode()
+        t_array = pa.array([text], pa.string())
+        i_array = pa.array([int(x) for x in range(len(t_array))])
+        return pa.table([i_array, t_array], names=['index', 'text'])
 
     def exists(self) -> bool:
         """ Returns True is the file exists """
