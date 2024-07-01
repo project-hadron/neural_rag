@@ -6,6 +6,7 @@ numpy~=1.26.4
 pandas~=2.2.2
 Requests~=2.31.0
 PyMuPDF
+pymupdf4llm
 sentence_transformers
 spacy~=3.7.2
 tqdm

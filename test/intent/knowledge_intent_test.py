@@ -69,7 +69,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result, head=5).to_string())
-        result = tools.str_remove_text(result, indices=[0, (2,7)])
+        result = tools.filter_on_mask(result, indices=[0, (2, 7)])
         print(kn.table_report(result, head=5).to_string())
 
     def test_str_remove_text_pattern(self):
@@ -82,7 +82,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result, head=5).to_string())
-        result = tools.str_remove_text(result, pattern='^You.*(You|Unhappy)')
+        result = tools.filter_on_mask(result, pattern='^You.*(You|Unhappy)')
         print(kn.table_report(result, head=5).to_string())
 
 
@@ -215,6 +215,23 @@ class KnowledgeIntentTest(unittest.TestCase):
         # kn.remove_canonical(kn.CONNECTOR_PERSIST)
         # result = kn.load_persist_canonical(query='long wait')
         # print(kn.table_report(result).to_string())
+
+    def test_text_from_load(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        kn.set_source_uri(uri)
+        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=False)
+        print(kn.table_report(tbl, headers='text', drop=True).to_string())
+
+    def test_text_join(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        kn.set_source_uri(uri)
+        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True)
+        result = tools.text_join(tbl)
+        print(kn.table_report(result, headers='text', drop=True).to_string())
 
     def test_raise(self):
         startTime = datetime.now()

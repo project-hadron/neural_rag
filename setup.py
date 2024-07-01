@@ -75,6 +75,7 @@ setup(
         'scikit-learn',
         'requests',
         'pymupdf',
+        'pymupdf4llm',
         'sentence_transformers',
         'spacy',
         'tqdm',

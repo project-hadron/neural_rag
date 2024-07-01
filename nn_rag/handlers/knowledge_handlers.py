@@ -1,11 +1,10 @@
 import io
-
-import numpy as np
+import pymupdf
+import pymupdf4llm
 import requests
 import os
 import pyarrow as pa
 import pyarrow.parquet as pq
-import fitz
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, AbstractPersistHandler
 from ds_core.handlers.abstract_handlers import ConnectorContract, HandlerFactory
 
@@ -13,7 +12,17 @@ __author__ = 'Darryl Oatridge'
 
 
 class KnowledgeSourceHandler(AbstractSourceHandler):
-    """ PyArrow read only Source Handler. """
+    """ This handler class uses pymupdf package. PyMuPDF is a Python binding for MuPDF, a
+    lightweight PDF, XPS, and eBook reader.
+
+        URI example
+            uri = "<<filename>>" file_type='pdf', as_pages=False, as_markdown=False
+
+        params:
+            file_type: (optional) The file type being loaded. The default is 'pdf'
+            as_pages: (optional) if the return should be in pages. The default is False
+            as_markdown: (optional) if the return should be Markdown text. The default is False
+    """
 
     def __init__(self, connector_contract: ConnectorContract):
         """ initialise the Handler passing the connector_contract dictionary """
@@ -23,7 +32,7 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
 
     def supported_types(self) -> list:
         """ The source types supported with this module"""
-        return ['parquet', 'txt', 'pdf', 'embedding']
+        return ['parquet', 'txt', 'pdf']
 
     def load_canonical(self, **kwargs) -> pa.Table:
         """ returns the canonical dataset based on the connector contract. """
@@ -32,6 +41,8 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
         _cc = self.connector_contract
         load_params = kwargs
         load_params.update(_cc.kwargs)  # Update with any kwargs in the Connector Contract
+        as_pages = load_params.get('as_pages', False)
+        as_markdown = load_params.get('as_markdown', False)
         if load_params.get('file_type', False):
             file_type = load_params.pop('file_type', 'pdf')
             address = _cc.uri
@@ -51,17 +62,13 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
             if _cc.schema.startswith('http'):
                 request = requests.get(address)
                 filestream = io.BytesIO(request.content)
-                with fitz.open(stream=filestream, filetype=file_type) as doc:
-                    doc = chr(12).join([page.get_text() for page in doc])
+                with pymupdf.open(stream=filestream, filetype=file_type) as doc:
+                    return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
             else:
-                with fitz.open(address) as doc:  # open document
-                    doc = chr(12).join([page.get_text() for page in doc])
+                with pymupdf.open(address) as doc:
+                    return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
         except:
             raise LookupError('The source format {} is not currently supported'.format(file_type))
-        text = doc.encode().decode()
-        t_array = pa.array([text], pa.string())
-        i_array = pa.array([int(x) for x in range(len(t_array))])
-        return pa.table([i_array, t_array], names=['index', 'text'])
 
     def exists(self) -> bool:
         """ Returns True is the file exists """
@@ -104,6 +111,43 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
         """ manual reset to say the file has been seen. This is automatically called if the file is loaded"""
         changed = changed if isinstance(changed, bool) else False
         self._changed_flag = changed
+
+    @staticmethod
+    def _get_text_from_doc(doc, as_markdown: bool, as_pages: bool) -> pa.Table:
+        if as_pages:
+            pages_and_texts = []
+            if as_markdown:
+                for idx, chunk in enumerate(pymupdf4llm.to_markdown(doc, page_chunks=True)):
+                    text = chunk['text'].encode().decode()
+                    pages_and_texts.append(
+                        {"index": idx,
+                         "page_number": chunk['metadata']['page'],
+                         "page_char_count": len(text),
+                         "page_word_count": len(text.split(" ")),
+                         "page_sentence_count_raw": len(text.split(". ")),
+                         "page_token_count": round(len(text) / 4),
+                         "page_tables": chunk['tables'],
+                         "text": text})
+            else:
+                for idx, page in enumerate(doc):
+                    text = page.get_text().encode().decode()
+                    pages_and_texts.append(
+                        {"index": idx,
+                         "page_number": page.number,
+                         "page_char_count": len(text),
+                         "page_word_count": len(text.split(" ")),
+                         "page_sentence_count_raw": len(text.split(". ")),
+                         "page_token_count": round(len(text) / 4),
+                         "text": text})
+            return pa.Table.from_pylist(pages_and_texts)
+        else:
+            if as_markdown:
+                text = pymupdf4llm.to_markdown(doc).encode().decode()
+            else:
+                text = chr(12).join([page.get_text() for page in doc]).encode().decode()
+            t_array = pa.array([text], pa.string())
+            i_array = pa.array([int(x) for x in range(len(t_array))])
+            return pa.table([i_array, t_array], names=['index', 'text'])
 
 
 class KnowledgePersistHandler(KnowledgeSourceHandler, AbstractPersistHandler):

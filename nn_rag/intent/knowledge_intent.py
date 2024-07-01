@@ -15,9 +15,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """This class represents RAG intent actions whereby data preparation can be done
     """
 
-    def str_filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
-                                save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
-                                replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
+                            save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
+                            replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes the column name header from the canonical and applies the condition. Where the condition
         is satisfied within the column, the canonical row is removed.
 
@@ -29,7 +29,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 [(1, 'greater', 'or'), (-1, 'less', None)]
                 [(pa.array(['INACTIVE', 'PENDING']), 'is_in', None)]
 
-        The operator and logic are taken from pyarrow.compute and are:
+        The operator and logic are taken from pyarrow compute and are:
 
                 operator => match_substring, match_substring_regex, equal, greater, less, greater_equal, less_equal, not_equal, is_in, is_null
                 logic => and, or, xor, and_not
@@ -63,9 +63,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
         return canonical.filter(mask)
 
-    def str_remove_text(self, canonical: pa.Table, indices: list=None, pattern: str=None, to_header: str=None,
-                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                        replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def filter_on_mask(self, canonical: pa.Table, indices: list=None, pattern: str=None, save_intent: bool=None,
+                       intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                       remove_duplicates: bool=None) -> pa.Table:
         """ Taking a canonical with a text column and removes based on either a regex
         pattern or list of index.
 
@@ -77,10 +77,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         removed. For example '^Do Not Use Without Permission' would remove rows
         where the text starts with that string.
 
-        :param canonical: a Table of sentences and stats
+        :param canonical: a pa.Table as the reference table
         :param indices: (optional) a list of numbers and/or tuples for sentences to be dropped
         :param pattern: (optional) a regex expression pattern to remove an element
-        :param to_header: (optional) an optional name to call the column
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -132,23 +131,20 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return Commons.table_append(tbl, t2)
         return canonical
 
-    def str_pattern_replace(self, canonical: pa.Table, header: str, pattern: str, replacement: str, is_regex: bool=None,
-                            max_replacements: int=None, to_header: str=None, save_intent: bool=None,
-                            intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                            remove_duplicates: bool=None) -> pa.Table:
-        """ For each string in header, replace non-overlapping substrings that match the given literal pattern
+    def filter_replace_str(self, canonical: pa.Table, pattern: str, replacement: str, is_regex: bool=None,
+                           max_replacements: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """ For each string in 'text', replace non-overlapping substrings that match the given literal pattern
         with the given replacement. If max_replacements is given and not equal to -1, it limits the maximum
         amount replacements per input, counted from the left. Null values emit null.
 
         If is a regex then RE2 Regular Expression Syntax is used
 
-        :param canonical:
-        :param header: The name of the target string column
+        :param canonical: a pa.Table as the reference table
         :param pattern: Substring pattern to look for inside input values.
         :param replacement: What to replace the pattern with.
         :param is_regex: (optional) if the pattern is a regex. Default False
         :param max_replacements: (optional) The maximum number of strings to replace in each input value.
-        :param to_header: (optional) an optional name to call the column
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -168,10 +164,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
-        header = self._extract_value(header)
-        to_header  = self._extract_value(to_header)
         is_regex = is_regex if isinstance(is_regex, bool) else False
-        c = canonical.column(header).combine_chunks()
+        c = canonical.column('text').combine_chunks()
         is_dict = False
         if pa.types.is_dictionary(c.type):
             is_dict = True
@@ -182,19 +176,53 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             rtn_values = pc.replace_substring(c, pattern, replacement, max_replacements=max_replacements)
         if is_dict:
             rtn_values = rtn_values.dictionary_encode()
-        to_header = to_header if isinstance(to_header, str) else header
-        return Commons.table_append(canonical, pa.table([rtn_values], names=[to_header]))
+        return Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
+
+    def text_join(self, canonical: pa.Table, save_intent: bool=None, intent_level: [int, str]=None,
+                  intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """ Takes a table and joins all the row text into a single row.
+
+        :param canonical: a pa.Table as the reference table
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent recipie options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # code block
+        canonical = self._get_canonical(canonical)
+        text = canonical.column('text').to_pylist()
+        total = ''
+        for item in text:
+            total = ' '.join(item)
+        t_array = pa.array([str(total)], pa.string())
+        i_array = pa.array([int(x) for x in range(len(t_array))])
+        return pa.table([i_array, t_array], names=['index', 'text'])
 
     def text_to_paragraphs(self, canonical: pa.Table, top_words: int=None, threshold_words: int=None,
-                           top_nouns: int=None, threshold_nouns: int=None, sep: str=None, header: str=None,
+                           top_nouns: int=None, threshold_nouns: int=None, sep: str=None,
                            max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                            intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
-        :param canonical: a Table with a text column
+        :param canonical: a pa.Table as the reference table
+        :param top_words: (optional) the minimum number of repeated words to show
+        :param threshold_words: (optional)
+        :param top_nouns: (optional)
+        :param threshold_nouns: (optional)
         :param sep: (optional) The separator patter for the paragraphs
-        :param header: (optional) The name of the target text column, default 'text'
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -228,8 +256,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return document
 
         canonical = self._get_canonical(canonical)
-        header = self._extract_value(header)
-        header = header if isinstance(header, str) else 'text'
         top_words = top_words if isinstance(top_words, int) else 4
         top_nouns = top_nouns if isinstance(top_nouns, int) else 4
         threshold_words = threshold_words if isinstance(threshold_words, int) else 1
@@ -237,7 +263,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        text = canonical.column(header).to_pylist()
+        text = canonical.column('text').to_pylist()
         # load English parser
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("custom_sentencizer", before="parser")
@@ -295,14 +321,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentences(self, canonical: pa.Table, header: str=None, max_char_size: int=None, save_intent: bool=None,
+    def text_to_sentences(self, canonical: pa.Table, max_char_size: int=None, save_intent: bool=None,
                           intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
                           remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
         is generally used for text discovery and manipulation before chunking.
 
-        :param canonical: a Table with a text column
-        :param header: (optional) The name of the target text column, default 'text'
+        :param canonical: a pa.Table as the reference table
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -323,13 +348,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
-        header = self._extract_value(header)
-        header = header if isinstance(header, str) else 'text'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         # SpaCy
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("sentencizer")
-        text = canonical.column(header).to_pylist()
+        text = canonical.column('text').to_pylist()
         sub_text = []
         for item in text:
             sub_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
@@ -363,7 +386,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sentences[num]['sentence_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, header: str=None, overlap: int=None,
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                        replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
@@ -371,10 +394,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
         small sentences.
 
-        :param canonical: a text profile Table
+        :param canonical: a pa.Table as the reference table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
-        :param header: (optional) The name of the target text column, default 'text'
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -398,9 +420,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
         overlap = self._extract_value(overlap)
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
-        header = self._extract_value(header)
-        header = header if isinstance(header, str) else 'text'
-        text = canonical.column(header).to_pylist()
+        text = canonical.column('text').to_pylist()
         chunks = []
         for item in text:
             while len(item) > 0:
