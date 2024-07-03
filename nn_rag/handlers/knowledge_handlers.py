@@ -58,17 +58,14 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 address = io.BytesIO(requests.get(address).content)
             return pq.read_table(address, **load_params)
         # pymupdf
-        try:
-            if _cc.schema.startswith('http'):
-                request = requests.get(address)
-                filestream = io.BytesIO(request.content)
-                with pymupdf.open(stream=filestream, filetype=file_type) as doc:
-                    return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
-            else:
-                with pymupdf.open(address) as doc:
-                    return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
-        except:
-            raise LookupError('The source format {} is not currently supported'.format(file_type))
+        if _cc.schema.startswith('http'):
+            request = requests.get(address)
+            filestream = io.BytesIO(request.content)
+            with pymupdf.open(stream=filestream, filetype=file_type) as doc:
+                return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
+        else:
+            with pymupdf.open(address) as doc:
+                return self._get_text_from_doc(doc, as_markdown=as_markdown, as_pages=as_pages)
 
     def exists(self) -> bool:
         """ Returns True is the file exists """
@@ -138,6 +135,8 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                          "page_word_count": len(text.split(" ")),
                          "page_sentence_count_raw": len(text.split(". ")),
                          "page_token_count": round(len(text) / 4),
+                         "page_tables": [t.extract()
+                                         for t in page.find_tables().tables] if page.find_tables().tables else [],
                          "text": text})
             return pa.Table.from_pylist(pages_and_texts)
         else:

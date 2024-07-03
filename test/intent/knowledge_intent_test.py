@@ -219,7 +219,7 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_from_load(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        uri = '../../jupyter/knowledge/hadron/source/Global-Index-1st-Edition-Report.pdf'
         kn.set_source_uri(uri)
         tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=False)
         print(kn.table_report(tbl, headers='text', drop=True).to_string())
