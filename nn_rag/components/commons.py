@@ -58,7 +58,7 @@ class Commons(CoreCommons):
                      regex: [str, list]=None, drop: bool=None, index_header: [str, list]=None, bold: [str, list]=None,
                      large_font: [str, list]=None):
         """ generates a stylised version of the pyarrow table """
-        top = top if isinstance(top, int) else 10
+        top = top if isinstance(top, int) else t.num_rows
         report = Commons.filter_columns(t.slice(0, top), headers=headers, d_types=d_type, regex=regex, drop=drop)
         df = report.to_pandas()
         return Commons.report(df, index_header=index_header, bold=bold, large_font=large_font)
