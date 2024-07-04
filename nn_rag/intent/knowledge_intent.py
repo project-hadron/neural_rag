@@ -262,10 +262,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         canonical = self._get_canonical(canonical)
         has_stats = has_stats if isinstance(has_stats, bool) else True
-        top_words = top_words if isinstance(top_words, int) else 4
-        top_nouns = top_nouns if isinstance(top_nouns, int) else 4
-        threshold_words = threshold_words if isinstance(threshold_words, int) else 1
-        threshold_nouns = threshold_nouns if isinstance(threshold_nouns, int) else 1
+        top_words = top_words if isinstance(top_words, int) else 5
+        top_nouns = top_nouns if isinstance(top_nouns, int) else 5
+        threshold_words = threshold_words if isinstance(threshold_words, int) else 2
+        threshold_nouns = threshold_nouns if isinstance(threshold_nouns, int) else 2
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
@@ -327,7 +327,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 if not item['paragraph_nouns']:
                     continue
                 v1 = embedding_model.encode(' '.join(item['paragraph_nouns']))
-                v2 = embedding_model.encode(paragraphs[num+1]['paragraph_nouns'])
+                v2 = embedding_model.encode(paragraphs[num+1]['text'])
                 paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
