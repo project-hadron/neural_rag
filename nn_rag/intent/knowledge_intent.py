@@ -327,7 +327,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 if not item['paragraph_nouns']:
                     continue
                 v1 = embedding_model.encode(' '.join(item['paragraph_nouns']))
-                v2 = embedding_model.encode(paragraphs[num+1]['text'])
+                v2 = embedding_model.encode(paragraphs[num+1]['paragraph_nouns'])
                 paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
