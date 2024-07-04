@@ -118,7 +118,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         # arr = pa.array([text], pa.string())
         # tbl = pa.table([arr], names=['text'])
         result = tools.text_to_paragraphs(tbl)
-        print(kn.table_report(result, head=5).to_string())
+        print(kn.table_report(result, head=6, headers='paragraph_score').to_string())
 
     def test_text_to_sentence(self):
         kn = Knowledge.from_memory()
