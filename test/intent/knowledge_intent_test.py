@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 from ds_core.properties.property_manager import PropertyManager
 from nn_rag.components.commons import Commons
 from nn_rag import Knowledge
@@ -58,6 +59,19 @@ class KnowledgeIntentTest(unittest.TestCase):
             shutil.rmtree('working')
         except OSError:
             pass
+
+    def test_text_join(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
+                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.'
+                'You did not understand my needs.\n\nI have been mis-sold. My details are not accurate.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl, has_stats=False)
+        print(kn.table_report(result, head=5).to_string())
+        result = tools.text_join(result)
+        print(kn.table_report(result, head=5).to_string())
 
     def test_str_remove_text_index(self):
         kn = Knowledge.from_memory()
@@ -122,6 +136,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_sentences(tbl)
+        print(kn.table_report(result, head=5).to_string())
+        result = tools.text_to_sentences(tbl, has_stats=False)
         print(kn.table_report(result, head=5).to_string())
 
     def test_text_to_sentence_max(self):
@@ -221,16 +237,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         tools: KnowledgeIntent = kn.tools
         uri = '../../jupyter/knowledge/hadron/source/Global-Index-1st-Edition-Report.pdf'
         kn.set_source_uri(uri)
-        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=False)
-        print(kn.table_report(tbl, headers='text', drop=True).to_string())
-
-    def test_text_join(self):
-        kn = Knowledge.from_memory()
-        tools: KnowledgeIntent = kn.tools
-        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
-        kn.set_source_uri(uri)
-        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True)
-        result = tools.text_join(tbl)
+        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=True)
+        result = tbl.filter(pc.greater(tbl['page_table_count'], 0))
         print(kn.table_report(result, headers='text', drop=True).to_string())
 
     def test_raise(self):

@@ -113,40 +113,30 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
     def _get_text_from_doc(doc, as_markdown: bool, as_pages: bool) -> pa.Table:
         if as_pages:
             pages_and_texts = []
-            if as_markdown:
-                for idx, chunk in enumerate(pymupdf4llm.to_markdown(doc, page_chunks=True)):
-                    text = chunk['text'].encode().decode()
-                    pages_and_texts.append(
-                        {"index": idx,
-                         "page_number": chunk['metadata']['page'],
-                         "page_char_count": len(text),
-                         "page_word_count": len(text.split(" ")),
-                         "page_sentence_count_raw": len(text.split(". ")),
-                         "page_token_count": round(len(text) / 4),
-                         "page_tables": chunk['tables'],
-                         "text": text})
-            else:
-                for idx, page in enumerate(doc):
-                    text = page.get_text().encode().decode()
-                    pages_and_texts.append(
-                        {"index": idx,
-                         "page_number": page.number,
-                         "page_char_count": len(text),
-                         "page_word_count": len(text.split(" ")),
-                         "page_sentence_count_raw": len(text.split(". ")),
-                         "page_token_count": round(len(text) / 4),
-                         "page_tables": [t.extract()
-                                         for t in page.find_tables().tables] if page.find_tables().tables else [],
-                         "text": text})
+            for idx, page in enumerate(doc):
+                text = page.get_text().encode().decode()
+                tables = [t.extract() for t in page.find_tables().tables] if page.find_tables().tables else []
+                pages_and_texts.append(
+                    {"index": idx,
+                     "page_number": page.number,
+                     "page_char_count": len(text),
+                     "page_token_count": round(len(text) / 4),
+                     "page_table_count": len(tables),
+                     "page_tables": tables,
+                     "text": text})
             return pa.Table.from_pylist(pages_and_texts)
         else:
             if as_markdown:
                 text = pymupdf4llm.to_markdown(doc).encode().decode()
             else:
                 text = chr(12).join([page.get_text() for page in doc]).encode().decode()
-            t_array = pa.array([text], pa.string())
-            i_array = pa.array([int(x) for x in range(len(t_array))])
-            return pa.table([i_array, t_array], names=['index', 'text'])
+            full_text = [
+                {"index": 1,
+                 "text_char_count": len(text),
+                 "text_token_count": round(len(text) / 4),
+                 "text": text}
+            ]
+            return pa.Table.from_pylist(full_text)
 
 
 class KnowledgePersistHandler(KnowledgeSourceHandler, AbstractPersistHandler):
