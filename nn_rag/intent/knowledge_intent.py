@@ -5,8 +5,8 @@ from collections import Counter
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
-from sentence_transformers import SentenceTransformer, util
 from spacy.language import Language
+from sentence_transformers import SentenceTransformer, util
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 
@@ -214,17 +214,18 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         ]
         return pa.Table.from_pylist(full_text)
 
-    def text_to_paragraphs(self, canonical: pa.Table, has_stats: bool=None, sep: str=None, top_words: int=None,
-                           threshold_words: int=None, max_char_size: int=None, save_intent: bool=None,
-                           intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
-                           remove_duplicates: bool=None) -> pa.Table:
+    def text_to_paragraphs(self, canonical: pa.Table, has_stats: bool=None, sep: str=None, words_max: int=None,
+                           words_threshold: int=None, words_type: list=None, max_char_size: int=None,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
         :param canonical: a pa.Table as the reference table
         :param has_stats: (optional) if the stats should be included. This helps with speed. Default is True
-        :param top_words: (optional) the maximum number of words to show
-        :param threshold_words: (optional) the threshold count of repeating words
+        :param words_max: (optional) the maximum number of words to display and score. Default is 8
+        :param words_threshold: (optional) the threshold count of repeating words. Default is 2
+        :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default['NOUN','PROPN']
         :param sep: (optional) The separator patter for the paragraphs
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
@@ -260,8 +261,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         canonical = self._get_canonical(canonical)
         has_stats = has_stats if isinstance(has_stats, bool) else True
-        top_words = top_words if isinstance(top_words, int) else 5
-        threshold_words = threshold_words if isinstance(threshold_words, int) else 1
+        words_max = words_max if isinstance(words_max, int) else 8
+        words_threshold = words_threshold if isinstance(words_threshold, int) else 2
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
@@ -282,26 +284,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for num, p in enumerate(sep_para):
             if has_stats:
                 doc = nlp(p)
-                words = [token.text for token in doc
-                         if not token.is_stop and
-                         not token.is_punct and
-                         not token.is_space and
-                         not token.text in ['●']]
-                common_words = Counter(words).most_common(top_words)
-                words_freq = [k for k, c in common_words if c >= threshold_words]
-
-                # nouns = [token.text
-                #          for token in doc
-                #          if (not token.is_stop and
-                #              not token.is_punct and
-                #              not token.is_space and
-                #              not token.text in ['●'] and
-                #              token.pos_ == "NOUN")]
-                # common_nouns = Counter(nouns).most_common(top_nouns)
-                # nouns_freq = [k for k, c in common_nouns if c >= threshold_nouns]
+                words = [token.text for token in doc if token.pos_ in words_type]
+                common_words = Counter(words).most_common(words_max)
+                words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
             else:
                 words_freq = []
-                # nouns_freq = []
             paragraphs.append({
                 "index": num,
                 "paragraph_char_count": len(p),
@@ -309,8 +296,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 "paragraph_sentence_count": len(p.split(". ")),
                 "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
                 "paragraph_score": 0,
-                "paragraph_words": words_freq,
-                # "paragraph_nouns" : nouns_freq,
+                "paragraph_nouns_verbs": words_freq,
                 'text': p,
             })
         if has_stats:
@@ -326,8 +312,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentences(self, canonical: pa.Table, has_stats: bool=None, max_char_size: int=None, top_words: int=None,
-                          threshold_words: int=None, save_intent: bool=None, intent_level: [int, str]=None,
+    def text_to_sentences(self, canonical: pa.Table, has_stats: bool=None, max_char_size: int=None, words_max: int=None,
+                          words_threshold: int=None, words_type: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
         is generally used for text discovery and manipulation before chunking.
@@ -335,8 +321,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a pa.Table as the reference table
         :param has_stats: (optional) if the stats should be included. This helps with speed. Default is True
         :param max_char_size: (optional) the maximum number of characters to process at one time
-        :param top_words: (optional) the maximum number of words to show
-        :param threshold_words: (optional) the threshold count of repeating words
+        :param words_max: (optional) the maximum number of words to display and score. Default is 5
+        :param words_threshold: (optional) the threshold count of repeating words. Default is 1
+        :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default ['NOUN','PROPN']
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -358,9 +345,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         has_stats = has_stats if isinstance(has_stats, bool) else True
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        top_words = top_words if isinstance(top_words, int) else 5
-        threshold_words = threshold_words if isinstance(threshold_words, int) else 1
-
+        words_max = words_max if isinstance(words_max, int) else 5
+        words_threshold = words_threshold if isinstance(words_threshold, int) else 1
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
         # SpaCy
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("sentencizer")
@@ -377,13 +364,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for num, s in enumerate(sents):
             if has_stats:
                 doc = nlp(s)
-                words = [token.text for token in doc
-                         if not token.is_stop and
-                         not token.is_punct and
-                         not token.is_space and
-                         not token.text in ['●']]
-                common_words = Counter(words).most_common(top_words)
-                words_freq = [k for k, c in common_words if c >= threshold_words]
+                words = [token.text for token in doc if token.pos_ in words_type]
+                common_words = Counter(words).most_common(words_max)
+                words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
             else:
                 words_freq = []
             sentences.append({

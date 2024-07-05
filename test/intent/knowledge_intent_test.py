@@ -97,8 +97,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result, head=5).to_string())
         result = tools.filter_on_mask(result, pattern='^You.*(You|Unhappy)')
-        print(kn.table_report(result, head=5).to_string())
-
+        print(kn.table_report(result).to_string())
 
     def test_text_to_paragraph(self):
         kn = Knowledge.from_memory()
@@ -117,8 +116,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         #         'information. I can not use the customer portal. your customer portal is unhelpful.')
         # arr = pa.array([text], pa.string())
         # tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_paragraphs(tbl)
-        print(kn.table_report(result, head=6, headers='paragraph_score').to_string())
+        result = tools.text_to_paragraphs(tbl, words_threshold=2)
+        print(kn.table_report(result, head=6, headers='text', drop=True).to_string())
 
     def test_text_to_sentence(self):
         kn = Knowledge.from_memory()
@@ -135,7 +134,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_sentences(tbl)
+        result = tools.text_to_sentences(tbl, words_type=['NOUN','VERB','ADJ','ADV',])
         print(kn.table_report(result, head=5).to_string())
         result = tools.text_to_sentences(tbl, has_stats=False)
         print(kn.table_report(result, head=5).to_string())
