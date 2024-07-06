@@ -18,10 +18,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
                             save_intent: bool=None, intent_order: int=None, intent_level: [int, str]=None,
                             replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
-        """ Takes the column name header from the canonical and applies the condition. Where the condition
-        is satisfied within the column, the canonical row is removed.
+        """ Taking a canonical with a text column and removes the rows based on a condition.
 
-        The selection is a list of triple tuples in the form: [(comparison, operation, logic)] where comparison
+        The condition is a list of triple tuples in the form: [(comparison, operation, logic)] where comparison
         is the item or column to compare, the operation is what to do when comparing and the logic if you are
         chaining tuples as in the logic to join to the next boolean flags to the current. An example might be:
 
@@ -296,7 +295,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 "paragraph_sentence_count": len(p.split(". ")),
                 "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
                 "paragraph_score": 0,
-                "paragraph_nouns_verbs": words_freq,
+                "paragraph_words": words_freq,
                 'text': p,
             })
         if has_stats:
