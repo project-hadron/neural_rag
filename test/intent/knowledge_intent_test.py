@@ -60,20 +60,20 @@ class KnowledgeIntentTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_text_join(self):
+    def test_filter_on_join(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
-                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.'
+        text = ('You took too long. You are not easy to deal with.\n\nPayment Failure/Incorrect Payment.\n\nYou provided '
+                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.\n\n'
                 'You did not understand my needs.\n\nI have been mis-sold. My details are not accurate.')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_paragraphs(tbl, has_stats=False)
-        print(kn.table_report(result, head=5).to_string())
-        result = tools.text_join(result)
-        print(kn.table_report(result, head=5).to_string())
+        result = tools.text_to_paragraphs(tbl)
+        print(kn.table_report(result).to_string())
+        result = tools.filter_on_join(result, indices=[2,3])
+        print(kn.table_report(result).to_string())
 
-    def test_str_remove_text_index(self):
+    def test_filter_on_mask_index(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
@@ -86,7 +86,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.filter_on_mask(result, indices=[0, (2, 7)])
         print(kn.table_report(result, head=5).to_string())
 
-    def test_str_remove_text_pattern(self):
+    def test_filter_on_mask_pattern(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
@@ -119,6 +119,19 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_to_paragraphs(tbl, words_threshold=2)
         print(kn.table_report(result, head=6, headers='text', drop=True).to_string())
 
+    def test_text_to_document(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment.\n\nYou provided '
+                'me with incorrect information. Unhappy with delay.\n\nUnsuitable advice. You never answered my question.'
+                'You did not understand my needs.\n\nI have been mis-sold. My details are not accurate.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl, include_score=False)
+        print(kn.table_report(result, head=5).to_string())
+        result = tools.text_to_document(result)
+        print(kn.table_report(result, head=5).to_string())
+
     def test_text_to_sentence(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
@@ -136,7 +149,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_sentences(tbl, words_type=['NOUN','VERB','ADJ','ADV',])
         print(kn.table_report(result, head=5).to_string())
-        result = tools.text_to_sentences(tbl, has_stats=False)
+        result = tools.text_to_sentences(tbl, include_score=False)
         print(kn.table_report(result, head=5).to_string())
 
     def test_text_to_sentence_max(self):

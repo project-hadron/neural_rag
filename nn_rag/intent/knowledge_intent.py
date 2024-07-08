@@ -2,6 +2,8 @@ import ast
 import inspect
 import re
 from collections import Counter
+
+import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
@@ -60,7 +62,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = self._extract_value(header)
         h_col = canonical.column(header).combine_chunks()
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
-        return canonical.filter(mask)
+        canonical = canonical.filter(mask)
+        # reset the index
+        return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
 
     def filter_on_mask(self, canonical: pa.Table, indices: list=None, pattern: str=None, save_intent: bool=None,
                        intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
@@ -77,7 +81,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         where the text starts with that string.
 
         :param canonical: a pa.Table as the reference table
-        :param indices: (optional) a list of numbers and/or tuples for sentences to be dropped
+        :param indices: (optional) a list of numbers and/or tuples for rows to be dropped
         :param pattern: (optional) a regex expression pattern to remove an element
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -124,10 +128,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             filtered_dict = {key: [value for i, value in enumerate(column) if i not in indices]
                              for key, column in table_as_list.items()}
             # Convert the filtered dictionary back to an Arrow table
-            tbl = pa.table(filtered_dict)
+            canonical = pa.table(filtered_dict)
             # reset the index
-            t2 = pa.table([pa.array([int(x) for x in range(tbl.num_rows)])], names=['index'])
-            return Commons.table_append(tbl, t2)
+            return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
         return canonical
 
     def filter_replace_str(self, canonical: pa.Table, pattern: str, replacement: str, is_regex: bool=None,
@@ -165,20 +168,54 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         is_regex = is_regex if isinstance(is_regex, bool) else False
         c = canonical.column('text').combine_chunks()
-        is_dict = False
-        if pa.types.is_dictionary(c.type):
-            is_dict = True
-            c = c.dictionary_decode()
         if is_regex:
             rtn_values = pc.replace_substring_regex(c, pattern, replacement, max_replacements=max_replacements)
         else:
             rtn_values = pc.replace_substring(c, pattern, replacement, max_replacements=max_replacements)
-        if is_dict:
-            rtn_values = rtn_values.dictionary_encode()
-        return Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
+        canonical = Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
+        # reset the index
+        return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
 
-    def text_join(self, canonical: pa.Table, sep: str=None, save_intent: bool=None, intent_level: [int, str]=None,
-                  intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def filter_on_join(self, canonical: pa.Table, indices: list, save_intent: bool=None, intent_level: [int, str]=None,
+                       intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """ Takes a list of indices and joins those indices with the next row as a sum of the two. This allows
+        two rows with high similarity scores to be joined together.
+
+        :param canonical: a pa.Table as the reference table
+        :param indices: (optional) a list of index values to be joined to the following row
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent recipie options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # code block
+        canonical = self._get_canonical(canonical)
+        indices = Commons.list_formatter(indices)
+        df = pd.DataFrame(canonical.to_pandas())
+        for idx in range(1, df.shape[0]):
+            if idx - 1 in indices:
+                df.loc[idx, 'index'] = df.loc[idx - 1, 'index']
+        df = df.groupby('index').sum()
+        df['text'] = df['text'].apply(lambda x: re.sub(r'\.([A-Z])', r' \1', x))
+        canonical = pa.Table.from_pandas(df)
+        # reset the index
+        return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
+
+    def text_to_document(self, canonical: pa.Table, sep: str=None, save_intent: bool=None,
+                         intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                         remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table and joins all the row text into a single row.
 
         :param canonical: a pa.Table as the reference table
@@ -213,7 +250,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         ]
         return pa.Table.from_pylist(full_text)
 
-    def text_to_paragraphs(self, canonical: pa.Table, has_stats: bool=None, sep: str=None, words_max: int=None,
+    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None, words_max: int=None,
                            words_threshold: int=None, words_type: list=None, max_char_size: int=None,
                            save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                            replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
@@ -221,7 +258,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         is generally used for text discovery and manipulation before chunking.
 
         :param canonical: a pa.Table as the reference table
-        :param has_stats: (optional) if the stats should be included. This helps with speed. Default is True
+        :param include_score: (optional) if the score should be calculated. This helps with speed. Default is True
         :param words_max: (optional) the maximum number of words to display and score. Default is 8
         :param words_threshold: (optional) the threshold count of repeating words. Default is 2
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default['NOUN','PROPN']
@@ -259,7 +296,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return document
 
         canonical = self._get_canonical(canonical)
-        has_stats = has_stats if isinstance(has_stats, bool) else True
+        include_score = include_score if isinstance(include_score, bool) else True
         words_max = words_max if isinstance(words_max, int) else 8
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
@@ -281,7 +318,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in enumerate(sep_para):
-            if has_stats:
+            if words_max > 0:
                 doc = nlp(p)
                 words = [token.text for token in doc if token.pos_ in words_type]
                 common_words = Counter(words).most_common(words_max)
@@ -298,7 +335,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 "paragraph_words": words_freq,
                 'text': p,
             })
-        if has_stats:
+        if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
             for num, item in enumerate(paragraphs):
@@ -311,14 +348,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentences(self, canonical: pa.Table, has_stats: bool=None, max_char_size: int=None, words_max: int=None,
+    def text_to_sentences(self, canonical: pa.Table, include_score: bool=None, max_char_size: int=None, words_max: int=None,
                           words_threshold: int=None, words_type: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
         is generally used for text discovery and manipulation before chunking.
 
         :param canonical: a pa.Table as the reference table
-        :param has_stats: (optional) if the stats should be included. This helps with speed. Default is True
+        :param include_score: (optional) if the score should be included. This helps with speed. Default is True
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param words_max: (optional) the maximum number of words to display and score. Default is 5
         :param words_threshold: (optional) the threshold count of repeating words. Default is 1
@@ -342,7 +379,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         canonical = self._get_canonical(canonical)
-        has_stats = has_stats if isinstance(has_stats, bool) else True
+        include_score = include_score if isinstance(include_score, bool) else True
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         words_max = words_max if isinstance(words_max, int) else 5
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
@@ -361,7 +398,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents = [str(sentence) for sentence in sents]
         sentences = []
         for num, s in enumerate(sents):
-            if has_stats:
+            if words_max > 0:
                 doc = nlp(s)
                 words = [token.text for token in doc if token.pos_ in words_type]
                 common_words = Counter(words).most_common(words_max)
@@ -377,7 +414,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 "sentence_words": words_freq,
                 'text': s,
             })
-        if has_stats:
+        if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
             for num, item in enumerate(sentences):
