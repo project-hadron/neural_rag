@@ -2,7 +2,6 @@ import ast
 import inspect
 import re
 from collections import Counter
-from tqdm import tqdm
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -250,7 +249,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         ]
         return pa.Table.from_pylist(full_text)
 
-    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, show_progress: bool=None, sep: str=None,
+    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None,
                            words_max: int=None, words_threshold: int=None, words_type: list=None,
                            max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                            intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
@@ -259,7 +258,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a pa.Table as the reference table
         :param include_score: (optional) if the score should be calculated. This helps with speed. Default is True
-        :param show_progress: (optional) if to show or the progression bar
         :param words_max: (optional) the maximum number of words to display and score. Default is 8
         :param words_threshold: (optional) the threshold count of repeating words. Default is 2
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default['NOUN','PROPN']
@@ -298,7 +296,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
-        show_progress = show_progress if isinstance(show_progress, bool) else False
         words_max = words_max if isinstance(words_max, int) else 0
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
@@ -319,7 +316,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             for sent in doc.sents:
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
-        for num, p in tqdm(enumerate(sep_para), total=len(sep_para), disable=show_progress, desc='Creating Paragraphs'):
+        for num, p in enumerate(sep_para):
             if words_max > 0:
                 doc = nlp(p)
                 words = [token.text for token in doc if token.pos_ in words_type]
@@ -340,7 +337,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
-            for num, item in tqdm(enumerate(paragraphs), total=len(paragraphs)-1, disable=show_progress, desc='Creating Scores'):
+            for num, item in enumerate(paragraphs):
                 if num >= len(paragraphs) -1:
                     break
                 if not item['paragraph_words'] or not paragraphs[num+1]['paragraph_words']:
@@ -350,7 +347,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentences(self, canonical: pa.Table, include_score: bool=None, show_progress: bool=None,
+    def text_to_sentences(self, canonical: pa.Table, include_score: bool=None,
                           max_char_size: int=None, words_max: int=None, words_threshold: int=None, words_type: int=None,
                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
@@ -359,7 +356,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a pa.Table as the reference table
         :param include_score: (optional) if the score should be included. This helps with speed. Default is True
-        :param show_progress: (optional) if to show or the progression bar
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param words_max: (optional) the maximum number of words to display and score. Default is 5
         :param words_threshold: (optional) the threshold count of repeating words. Default is 1
@@ -384,7 +380,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
-        show_progress = show_progress if isinstance(show_progress, bool) else False
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         words_max = words_max if isinstance(words_max, int) else 0
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
@@ -402,7 +397,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents += list(nlp(item).sents)
             sents = [str(sentence) for sentence in sents]
         sentences = []
-        for num, s in tqdm(enumerate(sents), total=len(sents), disable=show_progress, desc='Creating Sentences'):
+        for num, s in enumerate(sents):
             if words_max > 0:
                 doc = nlp(s)
                 words = [token.text for token in doc if token.pos_ in words_type]
@@ -422,7 +417,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
-            for num, item in tqdm(enumerate(sentences), total=len(sentences)-1, disable=show_progress, desc='Creating Scores'):
+            for num, item in enumerate(sentences):
                 if num >= len(sentences) -1:
                     break
                 if not item['sentence_words'] or not sentences[num+1]['sentence_words']:
@@ -432,7 +427,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 sentences[num]['sentence_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None, show_progress: bool=None,
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                        replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
@@ -443,7 +438,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a pa.Table as the reference table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
-        :param show_progress: (optional) if to show or the progression bar
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -467,10 +461,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
         overlap = self._extract_value(overlap)
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
-        show_progress = show_progress if isinstance(show_progress, bool) else False
         text = canonical.column('text').to_pylist()
         chunks = []
-        for item in tqdm(text, total=len(text), disable=show_progress, desc='Creating Chunks'):
+        for item in text:
             while len(item) > 0:
                 text_chunk = item[:char_chunk_size + overlap]
                 item = item[char_chunk_size:]

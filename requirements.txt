@@ -15,4 +15,3 @@ accelerate
 bitsandbytes
 wheel
 torch
-tqdm

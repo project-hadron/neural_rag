@@ -83,7 +83,6 @@ setup(
         'accelerate',
         'bitsandbytes',
         'wheel',
-        'tqdm',
     ],
     extras_require={},
     test_suite='tests',
