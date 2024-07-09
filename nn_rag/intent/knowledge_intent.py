@@ -2,7 +2,7 @@ import ast
 import inspect
 import re
 from collections import Counter
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
