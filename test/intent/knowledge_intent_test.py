@@ -217,33 +217,6 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_to_chunks(sentences, char_chunk_size=100)
         print(kn.table_report(result).to_string())
 
-    def test_embedding(self):
-        kn = Knowledge.from_memory()
-        kn.set_source_uri("milvus://localhost:19530/rai")
-        kn.set_persist_uri("milvus://localhost:19530/rai")
-        tools: KnowledgeIntent = kn.tools
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
-                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
-                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
-                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-                'information. I can not use the customer portal. your customer portal is unhelpful')
-        arr = pa.array([text], pa.string())
-        tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentences(tbl)
-        chunks = tools.text_to_chunks(sentences)
-        # save
-        kn.save_persist_canonical(chunks)
-        result = kn.load_persist_canonical(query='long wait')
-        print(kn.table_report(result).to_string())
-        # kn.remove_canonical(kn.CONNECTOR_PERSIST)
-        # result = kn.load_persist_canonical(query='long wait')
-        # print(kn.table_report(result).to_string())
-
     def test_text_from_load(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
@@ -259,7 +232,6 @@ class KnowledgeIntentTest(unittest.TestCase):
             env = os.environ['NoEnvValueTest']
         self.assertTrue("'NoEnvValueTest'" in str(context.exception))
         print(f"Duration - {str(datetime.now() - startTime)}")
-
 
 def get_table():
     n_legs = pa.array([2, 4, 5, 100])
