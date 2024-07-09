@@ -2,7 +2,7 @@ import ast
 import inspect
 import re
 from collections import Counter
-
+from tqdm.auto import tqdm
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -317,7 +317,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             for sent in doc.sents:
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
-        for num, p in enumerate(sep_para):
+        for num, p in tqdm(enumerate(sep_para)):
             if words_max > 0:
                 doc = nlp(p)
                 words = [token.text for token in doc if token.pos_ in words_type]
@@ -397,7 +397,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             sents += list(nlp(item).sents)
             sents = [str(sentence) for sentence in sents]
         sentences = []
-        for num, s in enumerate(sents):
+        for num, s in tqdm(enumerate(sents)):
             if words_max > 0:
                 doc = nlp(s)
                 words = [token.text for token in doc if token.pos_ in words_type]
@@ -463,7 +463,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
         text = canonical.column('text').to_pylist()
         chunks = []
-        for item in text:
+        for item in tqdm(text):
             while len(item) > 0:
                 text_chunk = item[:char_chunk_size + overlap]
                 item = item[char_chunk_size:]
