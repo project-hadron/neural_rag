@@ -20,6 +20,7 @@ from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorC
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
 from sentence_transformers import SentenceTransformer
 import pyarrow as pa
+import torch
 
 __author__ = 'Darryl Oatridge'
 
@@ -53,11 +54,16 @@ class MilvusSourceHandler(AbstractSourceHandler):
         # required module import
         self.pymilvus = HandlerFactory.get_module('pymilvus')
         super().__init__(connector_contract)
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            device = "mps"
         # reset to use dialect
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         _database = self.connector_contract.path[1:] if self.connector_contract.path[1:] else 'rai'
         _embedding_name = os.environ.get('MILVUS_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
-        _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', 'cpu'))
+        _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', device))
         self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
         self._index_type = os.environ.get('MILVUS_INDEX_SIMILARITY_TYPE', _kwargs.pop('index_type', 'L2'))
         self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))

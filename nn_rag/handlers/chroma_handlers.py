@@ -16,6 +16,8 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 """
 
 import os
+
+import torch
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
 from sentence_transformers import SentenceTransformer
@@ -57,9 +59,15 @@ class ChromaSourceHandler(AbstractSourceHandler):
         # kwargs
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         self._reference = _kwargs.pop('reference', 'general')
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            device = "mps"
+
         # embedding model
         _embedding_name = os.environ.get('CHROMA_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
-        _device = os.environ.get('CHROMA_EMBEDDING_DEVICE', _kwargs.pop('device', 'cpu'))
+        _device = os.environ.get('CHROMA_EMBEDDING_DEVICE', _kwargs.pop('device', device))
         _dimensions = int(os.environ.get('CHROMA_EMBEDDING_DIM', _kwargs.pop('dim', '384')))
         self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '64')))
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device, truncate_dim=_dimensions)

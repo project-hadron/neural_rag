@@ -24,6 +24,7 @@ import pyarrow.compute as pc
 import spacy
 from spacy.language import Language
 from sentence_transformers import SentenceTransformer, util
+import torch
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 
@@ -320,6 +321,12 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sep = sep if sep else ['\n\n']
         is_regex = is_regex if isinstance(is_regex, bool) else False
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            device = "mps"
+
         # load English parser
         text = canonical.column('text').to_pylist()
         # if text is too large spacy will fail
@@ -366,15 +373,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             })
         if include_score:
             # set embedding
-            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
+            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
             for num, item in enumerate(paragraphs):
                 if num >= len(paragraphs) -1:
                     break
-                if not item['paragraph_words'] or not paragraphs[num+1]['paragraph_words']:
-                    continue
-                v1 = embedding_model.encode(' '.join(item['paragraph_words']))
-                v2 = embedding_model.encode(' '.join(paragraphs[num+1]['paragraph_words']))
-                paragraphs[num]['paragraph_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
+                v1 = embedding_model.encode(' '.join(item['text']))
+                v2 = embedding_model.encode(' '.join(paragraphs[num+1]['text']))
+                paragraphs[num]['paragraph_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, include_score: bool=None,
@@ -414,6 +419,12 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         words_max = words_max if isinstance(words_max, int) else 0
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
+        device = "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            device = "mps"
+
         # SpaCy
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("sentencizer")
@@ -446,15 +457,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             })
         if include_score:
             # set embedding
-            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2')
+            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
             for num, item in enumerate(sentences):
                 if num >= len(sentences) -1:
                     break
-                if not item['sentence_words'] or not sentences[num+1]['sentence_words']:
-                    continue
-                v1 = embedding_model.encode(' '.join(item['sentence_words']))
-                v2 = embedding_model.encode(' '.join(sentences[num+1]['sentence_words']))
-                sentences[num]['sentence_score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
+                v1 = embedding_model.encode(' '.join(item['text']))
+                v2 = embedding_model.encode(' '.join(sentences[num+1]['text']))
+                sentences[num]['sentence_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
     def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
