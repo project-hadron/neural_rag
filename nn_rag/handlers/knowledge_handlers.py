@@ -1,3 +1,20 @@
+"""
+Copyright (C) 2024  Gigas64
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You will find a copy of this licenseIn the root directory of the project
+or you can visit <https://www.gnu.org/licenses/> For further information.
+"""
+
 import io
 import pymupdf
 import pymupdf4llm
@@ -7,8 +24,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, AbstractPersistHandler
 from ds_core.handlers.abstract_handlers import ConnectorContract, HandlerFactory
-
-__author__ = 'Darryl Oatridge'
 
 
 class KnowledgeSourceHandler(AbstractSourceHandler):
@@ -57,6 +72,22 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
             if _cc.schema.startswith('http'):
                 address = io.BytesIO(requests.get(address).content)
             return pq.read_table(address, **load_params)
+        # txt, md
+        if file_type.lower() in ['txt', 'md']:
+            if _cc.schema.startswith('http'):
+                address = io.BytesIO(requests.get(address).content)
+                wrapper = io.TextIOWrapper(address, encoding='utf-8')
+                text = wrapper.read()
+            else:
+                with open(address) as f:
+                    text = f.read()
+            full_text = [
+                {"index": 1,
+                 "text_char_count": len(text),
+                 "text_token_count": round(len(text) / 4),
+                 "text": text}
+            ]
+            return pa.Table.from_pylist(full_text)
         # pymupdf
         if _cc.schema.startswith('http'):
             request = requests.get(address)

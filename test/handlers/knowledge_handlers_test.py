@@ -80,13 +80,21 @@ class FeatureBuilderTest(unittest.TestCase):
         result = handler.load_canonical(file_type='pdf')
         print(result.shape)
 
+    def test_md(self):
+        uri = "https://raw.githubusercontent.com/project-hadron/discovery-capability/master/README.md"
+        cc = ConnectorContract(uri, 'module_name', 'handler')
+        handler = KnowledgePersistHandler(cc)
+        result = handler.load_canonical()
+        c = result.column('text').combine_chunks()
+        print(c.to_pylist()[0][:300])
+
     def test_txt(self):
         uri = 'https://filesamples.com/samples/document/txt/sample3.txt'
         cc = ConnectorContract(uri, 'module_name', 'handler')
         handler = KnowledgePersistHandler(cc)
         result = handler.load_canonical()
         c = result.column('text').combine_chunks()
-        print(len(c))
+        print(c.to_pylist()[0][:300])
 
     def test_write_parquet(self):
         uri = './working/data/tensor.parquet'

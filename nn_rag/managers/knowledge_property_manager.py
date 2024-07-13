@@ -1,6 +1,21 @@
-from ds_core.properties.abstract_properties import AbstractPropertyManager
+"""
+Copyright (C) 2024  Gigas64
 
-__author__ = 'Darryl Oatridge'
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You will find a copy of this licenseIn the root directory of the project
+or you can visit <https://www.gnu.org/licenses/> For further information.
+"""
+
+from ds_core.properties.abstract_properties import AbstractPropertyManager
 
 
 class KnowledgePropertyManager(AbstractPropertyManager):

@@ -1,4 +1,20 @@
-import ast
+"""
+Copyright (C) 2024  Gigas64
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You will find a copy of this licenseIn the root directory of the project
+or you can visit <https://www.gnu.org/licenses/> For further information.
+"""
+
 import inspect
 import re
 from collections import Counter
@@ -218,7 +234,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         """ Takes a table and joins all the row text into a single row.
 
         :param canonical: a pa.Table as the reference table
-        :param sep: (optional) bin seperator between joining chunks. The default is '\n'
+        :param sep: (optional) seperator between joining chunks. The default is '\n'
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -249,7 +265,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         ]
         return pa.Table.from_pylist(full_text)
 
-    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None,
+    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: [str, list]=None, is_regex: bool=None,
                            words_max: int=None, words_threshold: int=None, words_type: list=None,
                            max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                            intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
@@ -261,7 +277,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param words_max: (optional) the maximum number of words to display and score. Default is 8
         :param words_threshold: (optional) the threshold count of repeating words. Default is 2
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default['NOUN','PROPN']
-        :param sep: (optional) The separator patter for the paragraphs
+        :param sep: (optional) The separator is a regular expression
+        :param is_regex: (optional) if the pattern is a regex. Default False
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -299,17 +316,30 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         words_max = words_max if isinstance(words_max, int) else 0
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
-        sep = self._extract_value(sep)
-        sep = sep if isinstance(sep, str) else '\n\n'
+        sep = Commons.list_formatter(self._extract_value(sep))
+        sep = sep if sep else ['\n\n']
+        is_regex = is_regex if isinstance(is_regex, bool) else False
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         # load English parser
         text = canonical.column('text').to_pylist()
+        # if text is too large spacy will fail
         chunked_text = []
         for item in text:
             chunked_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("custom_sentencizer", before="parser")
-        text = [x.replace(sep, ' | ') for x in chunked_text]
+        if is_regex:
+            text = []
+            for chunk in chunked_text:
+                for c in sep:
+                    parts = re.split(c, chunk)
+                    matches = re.findall(c, chunk)
+                    elements = [part.strip() for part in parts if part]
+                    for i, match in enumerate(matches):
+                        elements.insert(2 * i + 1, match.strip() + elements[2 * i + 1])
+                    text.append(elements)
+        else:
+            text = [chunk.replace(e, ' | ') for chunk in chunked_text for e in sep]
         sep_para = []
         for item in text:
             doc = nlp(item)

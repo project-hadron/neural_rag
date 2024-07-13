@@ -1,3 +1,20 @@
+"""
+Copyright (C) 2024  Gigas64
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You will find a copy of this licenseIn the root directory of the project
+or you can visit <https://www.gnu.org/licenses/> For further information.
+"""
+
 import os
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
@@ -63,7 +80,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         else:
             fields = [
                 self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=64),
-                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=1024),
+                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=2048),
                 self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
             ]
             # schema
@@ -100,7 +117,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         changed = changed if isinstance(changed, bool) else False
         self._changed_flag = changed
 
-    def load_canonical(self, query: [str, list], **kwargs) -> pa.Table:
+    def load_canonical(self, query: [str, list], expr: str=None, limit: int=None, **kwargs) -> pa.Table:
         """ returns the canonical dataset based on a vector similarity search
 
             search(
@@ -109,7 +126,6 @@ class MilvusSourceHandler(AbstractSourceHandler):
                 param: dict,
                 limit: int
                 expr: str | None,
-                partition_names: list[str] | None,
                 output_fields: list[str] | None,
                 timeout: float | None,
                 round_decimal: int
@@ -118,7 +134,8 @@ class MilvusSourceHandler(AbstractSourceHandler):
         """
         if not isinstance(self.connector_contract, ConnectorContract):
             raise ValueError("The Connector Contract is not valid")
-        expr = kwargs.get('expr', f"id like \"{str(self._reference)}_\"")
+        expr = expr if isinstance(expr, str) else None
+        limit = limit if isinstance(limit, int) else self._search_limit
         # get collection
         if not self._collection:
             self._collection = self.pymilvus.Collection(self._collection_name)
@@ -132,7 +149,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
             anns_field = "embeddings",
             param = params,
             expr = expr,
-            limit = self._search_limit,
+            limit = limit,
             output_fields=["source"])
         self._collection.release()
         # build table
@@ -155,7 +172,7 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
             return False
         _params = kwargs
         chunks = canonical.to_pylist()
-        text_chunks = [item["chunk_text"] for item in chunks]
+        text_chunks = [item["text"] for item in chunks]
         embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
         data = [
             [f"{str(self._reference)}_{str(i)}" for i in range(len(text_chunks))],

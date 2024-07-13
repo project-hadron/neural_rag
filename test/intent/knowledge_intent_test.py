@@ -102,21 +102,21 @@ class KnowledgeIntentTest(unittest.TestCase):
     def test_text_to_paragraph(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
-        tbl = kn.set_source_uri(uri).load_source_canonical()
-        # text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-        #         'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.\n\n'
-        #         'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
-        #         'for too much information. You were not helpful. Payment not generated/received by customer. You did '
-        #         'not keep me updated. Incorrect information given. The performance of my product was poor.\n\n No reply '
-        #         'to customer contact. Requested documentation not issued. You did not explain the terms & conditions.\n\n'
-        #         'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
-        #         'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly.\n\n'
-        #         'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
-        #         'information. I can not use the customer portal. your customer portal is unhelpful.')
-        # arr = pa.array([text], pa.string())
-        # tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_paragraphs(tbl, words_threshold=2)
+        # uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        # tbl = kn.set_source_uri(uri).load_source_canonical()
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.\n\n'
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor.\n\n No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions.\n\n'
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly.\n\n'
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result, head=6, headers='text', drop=True).to_string())
 
     def test_text_to_document(self):
