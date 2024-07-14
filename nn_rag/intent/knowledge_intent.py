@@ -27,7 +27,7 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
-from tqdm import tqdm
+from tqdm.auto import tqdm, trange
 class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """This class represents RAG intent actions whereby data preparation can be done
     """
@@ -348,12 +348,12 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         else:
             text = [chunk.replace(sep, ' | ') for chunk in chunked_text]
         sep_para = []
-        for item in tqdm(text):
+        for item in tqdm(text, total=len(text), desc='sentence'):
             doc = nlp(item)
             for sent in doc.sents:
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
-        for num, p in tqdm(enumerate(sep_para)):
+        for num, p in tqdm(enumerate(sep_para), total=len(sep_para), desc='stats'):
             if words_max > 0:
                 doc = nlp(p)
                 words = [token.text for token in doc if token.pos_ in words_type]
@@ -374,7 +374,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-            for num, item in enumerate(paragraphs):
+            for num, item in tqdm(enumerate(paragraphs), total=len(paragraphs), desc='score'):
                 if num >= len(paragraphs) -1:
                     break
                 v1 = embedding_model.encode(' '.join(item['text']))
