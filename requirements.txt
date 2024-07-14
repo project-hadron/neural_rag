@@ -9,7 +9,6 @@ PyMuPDF
 pymupdf4llm
 sentence_transformers
 spacy~=3.7.2
-tqdm
 transformers
 accelerate
 bitsandbytes

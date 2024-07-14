@@ -266,7 +266,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         ]
         return pa.Table.from_pylist(full_text)
 
-    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: [str, list]=None, is_regex: bool=None,
+    def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None, pattern: str=None,
                            words_max: int=None, words_threshold: int=None, words_type: list=None,
                            max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                            intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
@@ -275,11 +275,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         :param canonical: a pa.Table as the reference table
         :param include_score: (optional) if the score should be calculated. This helps with speed. Default is True
-        :param words_max: (optional) the maximum number of words to display and score. Default is 8
+        :param words_max: (optional) the maximum number of words to display and order by score. Default is 4
         :param words_threshold: (optional) the threshold count of repeating words. Default is 2
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default['NOUN','PROPN']
-        :param sep: (optional) The separator is a regular expression
-        :param is_regex: (optional) if the pattern is a regex. Default False
+        :param sep: (optional) a string to separate the paragraphs. Default is '\n\n'
+        :param pattern: (optional) a regex to separate the paragraphs. Must start with a capital or left punctuation
         :param max_char_size: (optional) the maximum number of characters to process at one time
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -304,7 +304,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         def custom_sentencizer(document):
             for i, token in enumerate(document[:-2]):
                 # Define sentence start if pipe + titlecase token
-                if token.text == "|" and document[i + 1].is_title:
+                if token.text == "|" and (document[i + 1].is_title or
+                                          document[i + 1].is_left_punct):
                     document[i + 1].is_sent_start = True
                 else:
                     # Explicitly set sentence start to False otherwise, to tell
@@ -314,19 +315,17 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
-        words_max = words_max if isinstance(words_max, int) else 0
+        words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
-        sep = Commons.list_formatter(self._extract_value(sep))
-        sep = sep if sep else ['\n\n']
-        is_regex = is_regex if isinstance(is_regex, bool) else False
+        sep = self._extract_value(sep)
+        sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         device = "cpu"
         if torch.cuda.is_available():
             device = "cuda"
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             device = "mps"
-
         # load English parser
         text = canonical.column('text').to_pylist()
         # if text is too large spacy will fail
@@ -335,18 +334,20 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             chunked_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("custom_sentencizer", before="parser")
-        if is_regex:
+        if isinstance(pattern, str):
             text = []
             for chunk in chunked_text:
-                for c in sep:
-                    parts = re.split(c, chunk)
-                    matches = re.findall(c, chunk)
-                    elements = [part.strip() for part in parts if part]
-                    for i, match in enumerate(matches):
-                        elements.insert(2 * i + 1, match.strip() + elements[2 * i + 1])
-                    text.append(elements)
+                sub_text = []
+                parts = re.split(pattern, chunk)
+                matches = re.findall(pattern, chunk)
+                elements = [parts[0].strip()] if parts[0] else []
+                for i in range(len(matches)):
+                    elements.append(str(matches[i] + parts[i + 1]).strip())
+                sub_text += elements
+                sub_text = ' | '.join(sub_text)
+                text.append(sub_text)
         else:
-            text = [chunk.replace(e, ' | ') for chunk in chunked_text for e in sep]
+            text = [chunk.replace(sep, ' | ') for chunk in chunked_text]
         sep_para = []
         for item in text:
             doc = nlp(item)
@@ -416,7 +417,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        words_max = words_max if isinstance(words_max, int) else 0
+        words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
         device = "cpu"

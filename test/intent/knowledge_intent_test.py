@@ -121,6 +121,19 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.text_to_paragraphs(tbl, words_max=2, include_score=True)
         print(kn.table_report(result, head=6, headers='text', drop=True).to_string())
 
+    def test_text_to_paragraph_regex(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        # uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
+        # tbl = kn.set_source_uri(uri).load_source_canonical()
+        text = ('You took too long. (1) You are not easy to deal with.\n\nPayment Failure/Incorrect Payment.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        # result = tools.text_to_paragraphs(tbl, pattern='\n')
+        result = tools.text_to_paragraphs(tbl, pattern='\(.*?\)')
+        # result = tools.text_to_paragraphs(tbl)
+        print(result.column('text'))
+
     def test_text_to_document(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools

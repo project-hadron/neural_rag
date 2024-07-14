@@ -78,7 +78,6 @@ setup(
         'pymupdf4llm',
         'sentence_transformers',
         'spacy',
-        'tqdm',
         'transformers',
         'accelerate',
         'bitsandbytes',
