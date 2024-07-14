@@ -27,8 +27,7 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
-
-
+from tqdm import tqdm
 class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """This class represents RAG intent actions whereby data preparation can be done
     """
@@ -349,12 +348,12 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         else:
             text = [chunk.replace(sep, ' | ') for chunk in chunked_text]
         sep_para = []
-        for item in text:
+        for item in tqdm(text):
             doc = nlp(item)
             for sent in doc.sents:
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
-        for num, p in enumerate(sep_para):
+        for num, p in tqdm(enumerate(sep_para)):
             if words_max > 0:
                 doc = nlp(p)
                 words = [token.text for token in doc if token.pos_ in words_type]
