@@ -297,26 +297,25 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
                                    intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
-        # remove intent params
 
-        @Language.component("custom_sentencizer")
-        def custom_sentencizer(document):
-            for i, token in tqdm(enumerate(document[:-2]), total=len(document), desc='paragraph'):
+        @Language.component("set_custom_paragraph")
+        def set_custom_paragraph(document):
+            for token in tqdm(document[:-2], total=len(document)-2, desc='building paragraphs'):
                 # Define sentence start if pipe + titlecase token
-                if token.text == "|" and (document[i + 1].is_title or
-                                          document[i + 1].is_left_punct):
-                    document[i + 1].is_sent_start = True
+                if token.text == "|" and (document[token.i + 1].is_title or
+                                          document[token.i + 1].is_left_punct):
+                    document[token.i + 1].is_sent_start = True
                 else:
                     # Explicitly set sentence start to False otherwise, to tell
                     # the parser to leave those tokens alone
-                    document[i + 1].is_sent_start = False
+                    document[token.i + 1].is_sent_start = False
             return document
 
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
-        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN','VERB']
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
@@ -332,7 +331,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             chunked_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
         nlp = spacy.load("en_core_web_sm")
-        nlp.add_pipe("custom_sentencizer", before="parser")
+        nlp.add_pipe("set_custom_paragraph", before="parser")
         if isinstance(pattern, str):
             text = []
             for chunk in chunked_text:
@@ -347,39 +346,37 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 text.append(sub_text)
         else:
             text = [chunk.replace(sep, ' | ') for chunk in chunked_text]
-        sep_para = []
-        for item in text:
-            doc = nlp(item)
-            for sent in doc.sents:
-                sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
-        for num, p in tqdm(enumerate(sep_para), total=len(sep_para), desc='stats'):
-            if words_max > 0:
-                doc = nlp(p)
-                words = [token.text for token in doc if token.pos_ in words_type]
-                common_words = Counter(words).most_common(words_max)
-                words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
-            else:
-                words_freq = []
-            paragraphs.append({
-                "index": num,
-                "paragraph_char_count": len(p),
-                "paragraph_word_count": len(p.split(" ")),
-                "paragraph_sentence_count": len(p.split(". ")),
-                "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
-                "paragraph_score": 0,
-                "paragraph_words": words_freq,
-                'text': p,
-            })
-        if include_score:
-            # set embedding
-            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-            for num, item in tqdm(enumerate(paragraphs), total=len(paragraphs), desc='score'):
-                if num >= len(paragraphs) -1:
-                    break
-                v1 = embedding_model.encode(' '.join(item['text']))
-                v2 = embedding_model.encode(' '.join(paragraphs[num+1]['text']))
-                paragraphs[num]['paragraph_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+        for item in text:
+            sep_para = []
+            doc = nlp(item)
+            for num, p in tqdm(enumerate(doc.sents), total=len(sep_para), desc='stats'):
+                if words_max > 0:
+                    words = [token.text for token in p if token.pos_ in words_type]
+                    common_words = Counter(words).most_common(words_max)
+                    words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
+                else:
+                    words_freq = []
+                p = str(p.text).replace(' |', ' ').replace('\n', ' ').strip()
+                paragraphs.append({
+                    "index": num,
+                    "paragraph_char_count": len(p),
+                    "paragraph_word_count": len(p.split(" ")),
+                    "paragraph_sentence_count": len(p.split(". ")),
+                    "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                    "paragraph_score": 0,
+                    "paragraph_words": words_freq,
+                    'text': p,
+                })
+            if include_score:
+                # set embedding
+                embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
+                for num, p in tqdm(enumerate(paragraphs), total=len(paragraphs)-1, desc='build score'):
+                    if num >= len(paragraphs) -1:
+                        break
+                    v1 = embedding_model.encode(' '.join(p['text']))
+                    v2 = embedding_model.encode(' '.join(paragraphs[num+1]['text']))
+                    paragraphs[num]['paragraph_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, include_score: bool=None,
@@ -413,57 +410,60 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
+        @Language.component("set_custom_sentence")
+        def set_custom_sentence(document):
+            for token in tqdm(document[:-1], total=len(document)-1, desc='building sentence'):
+                if token in ['.','?','!'] and document[token.i + 1].is_title:
+                    document[token.i + 1].is_sent_start = True
+            return document
+
         canonical = self._get_canonical(canonical)
         include_score = include_score if isinstance(include_score, bool) else False
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
-        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN','VERB']
         device = "cpu"
         if torch.cuda.is_available():
             device = "cuda"
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             device = "mps"
 
-        # SpaCy
+        # SpaCy no parser
         nlp = spacy.load("en_core_web_sm")
-        nlp.add_pipe("sentencizer")
+        nlp.add_pipe("set_custom_sentence", before="parser")
         text = canonical.column('text').to_pylist()
-        sub_text = []
-        for item in text:
-            sub_text += [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]
-        text = sub_text
-        sents=[]
-        for item in text:
-            sents += list(nlp(item).sents)
-            sents = [str(sentence) for sentence in sents]
         sentences = []
-        for num, s in enumerate(sents):
-            if words_max > 0:
-                doc = nlp(s)
-                words = [token.text for token in doc if token.pos_ in words_type]
-                common_words = Counter(words).most_common(words_max)
-                words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
-            else:
-                words_freq = []
-            sentences.append({
-                "index": num,
-                "sentence_char_count": len(s),
-                "sentence_word_count": len(s.split(" ")),
-                "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
-                'sentence_score': 0,
-                "sentence_words": words_freq,
-                'text': s,
-            })
-        if include_score:
-            # set embedding
-            embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-            for num, item in enumerate(sentences):
-                if num >= len(sentences) -1:
-                    break
-                v1 = embedding_model.encode(' '.join(item['text']))
-                v2 = embedding_model.encode(' '.join(sentences[num+1]['text']))
-                sentences[num]['sentence_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+        for item in text:
+            for sub_text in [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]:
+                doc = nlp(sub_text)
+                doc_sents = [str(s) for s in list(doc.sents)]
+                for num, s in enumerate(doc.sents):
+                    if words_max > 0:
+                        words = [token.text for token in s if token.pos_ in words_type]
+                        common_words = Counter(words).most_common(words_max)
+                        words_freq = [k.lower() for k, c in common_words if c >= words_threshold]
+                    else:
+                        words_freq = []
+                    s = str(s)
+                    sentences.append({
+                        "index": num,
+                        "sentence_char_count": len(s),
+                        "sentence_word_count": len(s.split(" ")),
+                        "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                        'sentence_score': 0,
+                        "sentence_words": words_freq,
+                        'text': s,
+                    })
+                if include_score:
+                    # set embedding
+                    embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
+                    for num, part_sent in tqdm(enumerate(sentences), total=len(sentences)-1, desc='build score'):
+                        if num >= len(sentences) -1:
+                            break
+                        v1 = embedding_model.encode(' '.join(part_sent['text']))
+                        v2 = embedding_model.encode(' '.join(sentences[num+1]['text']))
+                        sentences[num]['sentence_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
     def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,

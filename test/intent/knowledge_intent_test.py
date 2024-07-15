@@ -118,8 +118,8 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful.')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_paragraphs(tbl, words_max=2, include_score=True)
-        print(kn.table_report(result, head=6, headers='text', drop=True).to_string())
+        result = tools.text_to_paragraphs(tbl, words_max=5, words_threshold=1, include_score=True)
+        print(kn.table_report(result, head=6).to_string())
 
     def test_text_to_paragraph_regex(self):
         kn = Knowledge.from_memory()
@@ -132,7 +132,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         # result = tools.text_to_paragraphs(tbl, pattern='\n')
         result = tools.text_to_paragraphs(tbl, pattern='\(.*?\)')
         # result = tools.text_to_paragraphs(tbl)
-        print(result.column('text'))
+        print(kn.table_report(result).to_string())
 
     def test_text_to_document(self):
         kn = Knowledge.from_memory()
@@ -185,7 +185,20 @@ class KnowledgeIntentTest(unittest.TestCase):
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
         result =  tools.text_to_sentences(tbl, max_char_size=100)
-        tprint(result, headers=['sentence_score', 'char_count', 'word_count'])
+        print(kn.table_report(result, head=5).to_string())
+
+    def test_text_to_sentence_max(self):
+        kn = Knowledge.from_env('tester', has_contract=False)
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
+        # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
+        result =  tools.text_to_sentences(tbl, include_score=True)
+        print(kn.table_report(result, head=5).to_string())
 
 
     def test_text_chunk(self):
