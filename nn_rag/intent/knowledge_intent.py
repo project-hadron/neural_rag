@@ -348,9 +348,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         else:
             text = [chunk.replace(sep, ' | ') for chunk in chunked_text]
         sep_para = []
-        for item in tqdm(text, total=len(text), desc='paragraph'):
+        for item in text:
             doc = nlp(item)
-            for sent in doc.sents:
+            for sent in tqdm(doc.sents, total=len(doc.sents), desc='paragraph'):
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in tqdm(enumerate(sep_para), total=len(sep_para), desc='stats'):
