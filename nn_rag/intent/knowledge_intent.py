@@ -301,7 +301,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         @Language.component("custom_sentencizer")
         def custom_sentencizer(document):
-            for i, token in enumerate(document[:-2]):
+            for i, token in tqdm(enumerate(document[:-2]), total=len(document), desc='paragraph'):
                 # Define sentence start if pipe + titlecase token
                 if token.text == "|" and (document[i + 1].is_title or
                                           document[i + 1].is_left_punct):
@@ -350,7 +350,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sep_para = []
         for item in text:
             doc = nlp(item)
-            for sent in tqdm(doc.sents, total=len(doc.sents), desc='paragraph'):
+            for sent in doc.sents:
                 sep_para.append(str(sent.text).replace(' |', ' ').replace('\n', ' ').strip())
         paragraphs = []
         for num, p in tqdm(enumerate(sep_para), total=len(sep_para), desc='stats'):
