@@ -350,7 +350,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             sep_para = []
             doc = nlp(item)
-            for num, p in tqdm(enumerate(doc.sents), total=len(doc), desc='paragraph stats'):
+            for num, p in tqdm(enumerate(doc.sents), total=sum(1 for _ in doc.sents), desc='paragraph stats'):
                 if words_max > 0:
                     words = [token.text for token in p if token.pos_ in words_type]
                     common_words = Counter(words).most_common(words_max)
@@ -438,7 +438,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             for sub_text in [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]:
                 doc = nlp(sub_text)
                 doc_sents = [str(s) for s in list(doc.sents)]
-                for num, s in tqdm(enumerate(doc.sents), total=len(doc_sents), desc='sentence stats'):
+                for num, s in tqdm(enumerate(doc.sents), total=sum(1 for _ in doc.sents), desc='sentence stats'):
                     if words_max > 0:
                         words = [token.text for token in s if token.pos_ in words_type]
                         common_words = Counter(words).most_common(words_max)
