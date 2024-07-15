@@ -83,8 +83,8 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                     text = f.read()
             full_text = [
                 {"index": 1,
-                 "text_char_count": len(text),
-                 "text_token_count": round(len(text) / 4),
+                 "char_count": len(text),
+                 "token_count": round(len(text) / 4),
                  "text": text}
             ]
             return pa.Table.from_pylist(full_text)
@@ -149,11 +149,11 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 tables = [t.extract() for t in page.find_tables().tables] if page.find_tables().tables else []
                 pages_and_texts.append(
                     {"index": idx,
-                     "page_number": page.number,
-                     "page_char_count": len(text),
-                     "page_token_count": round(len(text) / 4),
-                     "page_table_count": len(tables),
-                     "page_tables": tables,
+                     "number": page.number,
+                     "char_count": len(text),
+                     "token_count": round(len(text) / 4),
+                     "table_count": len(tables),
+                     "tables": tables,
                      "text": text})
             return pa.Table.from_pylist(pages_and_texts)
         else:
@@ -163,8 +163,8 @@ class KnowledgeSourceHandler(AbstractSourceHandler):
                 text = chr(12).join([page.get_text() for page in doc]).encode().decode()
             full_text = [
                 {"index": 1,
-                 "text_char_count": len(text),
-                 "text_token_count": round(len(text) / 4),
+                 "char_count": len(text),
+                 "token_count": round(len(text) / 4),
                  "text": text}
             ]
             return pa.Table.from_pylist(full_text)

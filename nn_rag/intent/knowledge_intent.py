@@ -259,8 +259,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         total = sep.join(text)
         full_text = [
             {"index": 1,
-             "text_char_count": len(text),
-             "text_token_count": round(len(text) / 4),
+             "char_count": len(text),
+             "token_count": round(len(text) / 4),
              "text": total}
         ]
         return pa.Table.from_pylist(full_text)
@@ -350,7 +350,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             sep_para = []
             doc = nlp(item)
-            for num, p in tqdm(enumerate(doc.sents), total=len(doc), desc='create statistics'):
+            for num, p in tqdm(enumerate(doc.sents), total=len(doc), desc='paragraph stats'):
                 if words_max > 0:
                     words = [token.text for token in p if token.pos_ in words_type]
                     common_words = Counter(words).most_common(words_max)
@@ -360,23 +360,23 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 p = str(p.text).replace(' |', ' ').replace('\n', ' ').strip()
                 paragraphs.append({
                     "index": num,
-                    "paragraph_char_count": len(p),
-                    "paragraph_word_count": len(p.split(" ")),
-                    "paragraph_sentence_count": len(p.split(". ")),
-                    "paragraph_token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
-                    "paragraph_score": 0,
-                    "paragraph_words": words_freq,
+                    "char_count": len(p),
+                    "word_count": len(p.split(" ")),
+                    "sentence_count": len(p.split(". ")),
+                    "token_count": round(len(p) / 4),  # 1 token = ~4 chars, see:
+                    "score": 0,
+                    "words": words_freq,
                     'text': p,
                 })
             if include_score:
                 # set embedding
                 embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-                for num, p in tqdm(enumerate(paragraphs), total=len(paragraphs)-1, desc='calculate scores'):
+                for num, p in tqdm(enumerate(paragraphs), total=len(paragraphs)-1, desc='paragraph scores'):
                     if num >= len(paragraphs) -1:
                         break
                     v1 = embedding_model.encode(' '.join(p['text']))
                     v2 = embedding_model.encode(' '.join(paragraphs[num+1]['text']))
-                    paragraphs[num]['paragraph_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+                    paragraphs[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, include_score: bool=None,
@@ -412,7 +412,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         @Language.component("set_custom_sentence")
         def set_custom_sentence(document):
-            for token in tqdm(document[:-1], total=len(document)-1, desc='building sentence'):
+            for token in tqdm(document[:-1], total=len(document)-1, desc='building sentences'):
                 if token in ['.','?','!'] and document[token.i + 1].is_title:
                     document[token.i + 1].is_sent_start = True
             return document
@@ -438,7 +438,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             for sub_text in [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]:
                 doc = nlp(sub_text)
                 doc_sents = [str(s) for s in list(doc.sents)]
-                for num, s in tqdm(enumerate(doc.sents), total=len(doc), desc='create statistics'):
+                for num, s in tqdm(enumerate(doc.sents), total=len(doc_sents), desc='sentence stats'):
                     if words_max > 0:
                         words = [token.text for token in s if token.pos_ in words_type]
                         common_words = Counter(words).most_common(words_max)
@@ -448,22 +448,22 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                     s = str(s)
                     sentences.append({
                         "index": num,
-                        "sentence_char_count": len(s),
-                        "sentence_word_count": len(s.split(" ")),
-                        "sentence_token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
-                        'sentence_score': 0,
-                        "sentence_words": words_freq,
+                        "char_count": len(s),
+                        "word_count": len(s.split(" ")),
+                        "token_count": round(len(s) / 4),  # 1 token = ~4 chars, see:
+                        'score': 0,
+                        "words": words_freq,
                         'text': s,
                     })
                 if include_score:
                     # set embedding
                     embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-                    for num, part_sent in tqdm(enumerate(sentences), total=len(sentences)-1, desc='calculate scores'):
+                    for num, part_sent in tqdm(enumerate(sentences), total=len(sentences)-1, desc='sentence scores'):
                         if num >= len(sentences) -1:
                             break
                         v1 = embedding_model.encode(' '.join(part_sent['text']))
                         v2 = embedding_model.encode(' '.join(sentences[num+1]['text']))
-                        sentences[num]['sentence_score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+                        sentences[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
     def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
@@ -502,7 +502,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
         text = canonical.column('text').to_pylist()
         chunks = []
-        for item in text:
+        for item in tqdm(text, total=len(text), desc='chunks stats'):
             while len(item) > 0:
                 text_chunk = item[:char_chunk_size + overlap]
                 item = item[char_chunk_size:]
@@ -511,9 +511,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 joined_text_chunk = "".join(text_chunk).replace("  ", " ").strip()
                 joined_text_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_text_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
                 # Get stats about the chunk
-                chunk_dict["chunk_char_count"] = len(joined_text_chunk)
-                chunk_dict["chunk_word_count"] = len([word for word in joined_text_chunk.split(" ")])
-                chunk_dict["chunk_token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
+                chunk_dict["char_count"] = len(joined_text_chunk)
+                chunk_dict["word_count"] = len([word for word in joined_text_chunk.split(" ")])
+                chunk_dict["token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
                 chunk_dict["text"] = joined_text_chunk
                 chunks.append(chunk_dict)
         return pa.Table.from_pylist(chunks)
