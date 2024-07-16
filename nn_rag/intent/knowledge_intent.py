@@ -23,7 +23,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
 from spacy.language import Language
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers.cross_encoder import CrossEncoder
 import torch
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
@@ -267,8 +267,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
     def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None, pattern: str=None,
                            words_max: int=None, words_threshold: int=None, words_type: list=None,
-                           max_char_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
-                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+                           max_char_size: int=None, cross_encoder: str=None, disable_progress_bar: bool=False,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -280,6 +281,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param sep: (optional) a string to separate the paragraphs. Default is '\n\n'
         :param pattern: (optional) a regex to separate the paragraphs. Must start with a capital or left punctuation
         :param max_char_size: (optional) the maximum number of characters to process at one time
+        :param cross_encoder: (optional) the cross encoder to use to predict the score
+        :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -300,7 +303,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         @Language.component("set_custom_paragraph")
         def set_custom_paragraph(document):
-            for token in tqdm(document[:-2], total=len(document)-2, desc='building paragraphs'):
+            for token in tqdm(document[:-2], disable=disable_progress_bar, total=len(document)-2, desc='building paragraphs'):
                 # Define sentence start if pipe + titlecase token
                 if token.text == "|" and (document[token.i + 1].is_title or
                                           document[token.i + 1].is_left_punct):
@@ -319,6 +322,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
+        cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
+        disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
         if torch.cuda.is_available():
             device = "cuda"
@@ -350,7 +355,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             sep_para = []
             doc = nlp(item)
-            for num, p in tqdm(enumerate(doc.sents), total=sum(1 for _ in doc.sents), desc='paragraph stats'):
+            for num, p in tqdm(enumerate(doc.sents), disable=disable_progress_bar, total=sum(1 for _ in doc.sents), desc='paragraph stats'):
                 if words_max > 0:
                     words = [token.text for token in p if token.pos_ in words_type]
                     common_words = Counter(words).most_common(words_max)
@@ -370,19 +375,18 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 })
             if include_score:
                 # set embedding
-                embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-                for num, p in tqdm(enumerate(paragraphs), total=len(paragraphs)-1, desc='paragraph scores'):
+                embedding_model = CrossEncoder(cross_encoder, device=device)
+                for num, p in tqdm(enumerate(paragraphs), disable=disable_progress_bar, total=len(paragraphs)-1, desc='paragraph scores'):
                     if num >= len(paragraphs) -1:
                         break
-                    v1 = embedding_model.encode(' '.join(p['text']))
-                    v2 = embedding_model.encode(' '.join(paragraphs[num+1]['text']))
-                    paragraphs[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+                    scores = embedding_model.predict([' '.join(p['text']), ' '.join(paragraphs[num+1]['text'])])
+                    paragraphs[num]['score'] = round(scores, 3)
         return pa.Table.from_pylist(paragraphs)
 
-    def text_to_sentences(self, canonical: pa.Table, include_score: bool=None,
-                          max_char_size: int=None, words_max: int=None, words_threshold: int=None, words_type: int=None,
-                          save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                          replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def text_to_sentences(self, canonical: pa.Table, include_score: bool=None, max_char_size: int=None,
+                          words_max: int=None, words_threshold: int=None, words_type: int=None, cross_encoder: str=None,
+                          disable_progress_bar: bool=False, save_intent: bool=None, intent_level: [int, str]=None,
+                          intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -392,6 +396,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param words_max: (optional) the maximum number of words to display and score. Default is 5
         :param words_threshold: (optional) the threshold count of repeating words. Default is 1
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default ['NOUN','PROPN']
+        :param cross_encoder: (optional) the cross encoder to use to predict the score
+        :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -412,7 +418,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         @Language.component("set_custom_sentence")
         def set_custom_sentence(document):
-            for token in tqdm(document[:-1], total=len(document)-1, desc='building sentences'):
+            for token in tqdm(document[:-1], disable=disable_progress_bar, total=len(document)-1, desc='building sentences'):
                 if token in ['.','?','!'] and document[token.i + 1].is_title:
                     document[token.i + 1].is_sent_start = True
             return document
@@ -423,6 +429,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN','VERB']
+        cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
+        disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
         if torch.cuda.is_available():
             device = "cuda"
@@ -438,7 +446,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             for sub_text in [item[i:i + max_char_size] for i in range(0, len(item), max_char_size)]:
                 doc = nlp(sub_text)
                 doc_sents = [str(s) for s in list(doc.sents)]
-                for num, s in tqdm(enumerate(doc.sents), total=sum(1 for _ in doc.sents), desc='sentence stats'):
+                for num, s in tqdm(enumerate(doc.sents), disable=disable_progress_bar, total=sum(1 for _ in doc.sents), desc='sentence stats'):
                     if words_max > 0:
                         words = [token.text for token in s if token.pos_ in words_type]
                         common_words = Counter(words).most_common(words_max)
@@ -457,16 +465,15 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                     })
                 if include_score:
                     # set embedding
-                    embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
-                    for num, part_sent in tqdm(enumerate(sentences), total=len(sentences)-1, desc='sentence scores'):
+                    embedding_model = CrossEncoder(cross_encoder, device=device)
+                    for num, part_sent in tqdm(enumerate(sentences), disable=disable_progress_bar, total=len(sentences)-1, desc='sentence scores'):
                         if num >= len(sentences) -1:
                             break
-                        v1 = embedding_model.encode(' '.join(part_sent['text']))
-                        v2 = embedding_model.encode(' '.join(sentences[num+1]['text']))
-                        sentences[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+                        scores = embedding_model.predict([' '.join(part_sent['text']), ' '.join(sentences[num+1]['text'])])
+                        sentences[num]['score'] = round(scores, 3)
         return pa.Table.from_pylist(sentences)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None, disable_progress_bar: bool=None,
                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
                        replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
@@ -477,6 +484,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param canonical: a pa.Table as the reference table
         :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
+        :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -500,9 +508,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
         overlap = self._extract_value(overlap)
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
+        disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         text = canonical.column('text').to_pylist()
         chunks = []
-        for item in tqdm(text, total=len(text), desc='chunks stats'):
+        for item in tqdm(text, total=len(text), disable=disable_progress_bar, desc='chunks stats'):
             while len(item) > 0:
                 text_chunk = item[:char_chunk_size + overlap]
                 item = item[char_chunk_size:]

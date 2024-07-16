@@ -250,8 +250,8 @@ class KnowledgeIntentTest(unittest.TestCase):
         uri = '../../jupyter/knowledge/hadron/source/Global-Index-1st-Edition-Report.pdf'
         kn.set_source_uri(uri)
         tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=True)
-        result = tbl.filter(pc.greater(tbl['page_table_count'], 0))
-        print(kn.table_report(result, headers='text', drop=True).to_string())
+        result = tbl.filter(pc.greater(tbl['table_count'], 0))
+        print(result.shape)
 
     def test_raise(self):
         startTime = datetime.now()
