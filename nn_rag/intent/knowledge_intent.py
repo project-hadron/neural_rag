@@ -193,13 +193,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # reset the index
         return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
 
-    def filter_on_join(self, canonical: pa.Table, indices: list, save_intent: bool=None, intent_level: [int, str]=None,
+    def filter_on_join(self, canonical: pa.Table, indices: list=None, chunk_size: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                        intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Takes a list of indices and joins those indices with the next row as a sum of the two. This allows
         two rows with high similarity scores to be joined together.
 
         :param canonical: a pa.Table as the reference table
         :param indices: (optional) a list of index values to be joined to the following row
+        :param chunk_size: (optional) tries to optimize the size of the chunks by joining small chunks. Default is 0
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -220,14 +221,25 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # code block
         canonical = self._get_canonical(canonical)
         indices = Commons.list_formatter(indices)
+        chunk_size = chunk_size if isinstance(chunk_size, int) else 0
         df = pd.DataFrame(canonical.to_pandas())
         # set the words to empty and score 0
         df = df.assign(score=0, words=np.empty((len(df), 0)).tolist())
         for idx in range(1, df.shape[0]):
             if idx - 1 in indices:
                 df.loc[idx, 'index'] = df.loc[idx - 1, 'index']
-        df = df.groupby('index').sum()
-        df['text'] = df['text'].apply(lambda x: re.sub(r'\.([A-Z])', r' \1', x))
+        df = df.groupby('index').sum().reset_index()
+        # chunk
+        if chunk_size > 0:
+            text_len = 0
+            for idx in range(1, df.shape[0]):
+                text_len += len(df.loc[idx, 'text'])
+                if text_len + df.loc[idx - 1, 'index'] > chunk_size:
+                    text_len = 0
+                    continue
+                df.loc[idx, 'index'] = df.loc[idx - 1, 'index']
+            df = df.groupby('index').sum().reset_index()
+        df['text'] = df['text'].apply(lambda x: re.sub(r'\.([A-Z])', r'. \1', x))
         canonical = pa.Table.from_pandas(df)
         # reset the index
         return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
@@ -508,7 +520,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         # remove intent params
         canonical = self._get_canonical(canonical)
         char_chunk_size = self._extract_value(char_chunk_size)
-        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 500
+        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 2500
         overlap = self._extract_value(overlap)
         overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False

@@ -60,7 +60,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_filter_on_join(self):
+    def test_filter_on_join_indicies(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with.\n\nPayment Failure/Incorrect Payment.\n\nYou provided '
@@ -70,7 +70,19 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result).to_string())
-        result = tools.filter_on_join(result, indices=[2,3])
+        result = tools.filter_on_join(result, indices=[2, 4])
+        print(kn.table_report(result).to_string())
+
+    def test_filter_on_join_chunks(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.'
+                'You did not understand my needs.I have been mis-sold. My details are not accurate.')
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_to_sentences(tbl)
+        result = tools.filter_on_join(result, indices=[], chunk_size=100)
         print(kn.table_report(result).to_string())
 
     def test_filter_on_mask_index(self):
