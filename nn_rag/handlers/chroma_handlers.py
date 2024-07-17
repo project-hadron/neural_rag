@@ -75,7 +75,8 @@ class ChromaSourceHandler(AbstractSourceHandler):
         self._search_limit = int(os.environ.get('CHROMA_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
         # server
         _path, _, _collection_name = self.connector_contract.path.rpartition('/')
-        self._collection_name = _collection_name if isinstance(_collection_name, str) else 'default'
+        self._collection_name = _collection_name if (isinstance(_collection_name, str) and
+                                                     len(_collection_name) >= 3) else 'default'
         if self.connector_contract.hostname and self.connector_contract.port:
             self._client = self.chroma.HttpClient(host=self.connector_contract.hostname,
                                                   port=self.connector_contract.port)
