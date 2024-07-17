@@ -18,13 +18,15 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 import inspect
 import re
 from collections import Counter
+
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
 from spacy.language import Language
 from sentence_transformers.cross_encoder import CrossEncoder
-import torch
+from torch import cuda, backends
 from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_knowledge_intent import AbstractKnowledgeIntentModel
 from tqdm.auto import tqdm
@@ -219,6 +221,8 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         canonical = self._get_canonical(canonical)
         indices = Commons.list_formatter(indices)
         df = pd.DataFrame(canonical.to_pandas())
+        # set the words to empty and score 0
+        df = df.assign(score=0, words=np.empty((len(df), 0)).tolist())
         for idx in range(1, df.shape[0]):
             if idx - 1 in indices:
                 df.loc[idx, 'index'] = df.loc[idx - 1, 'index']
@@ -325,9 +329,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
-        if torch.cuda.is_available():
+        if cuda.is_available():
             device = "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        elif hasattr(backends, "mps") and backends.mps.is_available():
             device = "mps"
         # load English parser
         text = canonical.column('text').to_pylist()
@@ -432,11 +436,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
-        if torch.cuda.is_available():
+        if cuda.is_available():
             device = "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        elif hasattr(backends, "mps") and backends.mps.is_available():
             device = "mps"
-
         # SpaCy no parser
         nlp = spacy.load("en_core_web_sm")
         nlp.add_pipe("set_custom_sentence", before="parser")
