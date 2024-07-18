@@ -24,6 +24,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
+from sentence_transformers import SentenceTransformer, util
 from spacy.language import Language
 from sentence_transformers.cross_encoder import CrossEncoder
 from torch import cuda, backends
@@ -283,9 +284,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
     def text_to_paragraphs(self, canonical: pa.Table, include_score: bool=None, sep: str=None, pattern: str=None,
                            words_max: int=None, words_threshold: int=None, words_type: list=None,
-                           max_char_size: int=None, cross_encoder: str=None, disable_progress_bar: bool=False,
-                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+                           max_char_size: int=None, use_cross_encoder: str=None, bi_encoder: str=None,
+                           cross_encoder: str=None, disable_progress_bar: bool=False, save_intent: bool=None,
+                           intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None,
+                           remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table with the text column and split it into perceived paragraphs. This method
         is generally used for text discovery and manipulation before chunking.
 
@@ -297,7 +299,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param sep: (optional) a string to separate the paragraphs. Default is '\n\n'
         :param pattern: (optional) a regex to separate the paragraphs. Must start with a capital or left punctuation
         :param max_char_size: (optional) the maximum number of characters to process at one time
-        :param cross_encoder: (optional) the cross encoder to use to predict the score
+        :param use_cross_encoder: (optional) if to use the cross_encoder
+        :param bi_encoder: (optional) bi encoder to use to predict the score. Defaults to "all-mpnet-base-v2"
+        :param cross_encoder: (optional) cross encoder for prediction. Default "cross-encoder/stsb-distilroberta-base"
         :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -334,11 +338,13 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         include_score = include_score if isinstance(include_score, bool) else False
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 2
-        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN','VERB']
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
+        bi_encoder = bi_encoder if isinstance(bi_encoder, str) else "all-mpnet-base-v2"
+        use_cross_encoder = use_cross_encoder if isinstance(use_cross_encoder, str) else False
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
         if cuda.is_available():
@@ -391,16 +397,26 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 })
             if include_score:
                 # set embedding
-                embedding_model = CrossEncoder(cross_encoder, device=device)
-                for num, p in tqdm(enumerate(paragraphs), disable=disable_progress_bar, total=len(paragraphs)-1, desc='paragraph scores'):
+                if use_cross_encoder:
+                    embedding_model = CrossEncoder(cross_encoder, device=device)
+                else:
+                    embedding_model = SentenceTransformer(model_name_or_path='all-mpnet-base-v2', device=device)
+                for num, paragraph in tqdm(enumerate(paragraphs), disable=disable_progress_bar, total=len(paragraphs)-1, desc='paragraph scores'):
                     if num >= len(paragraphs) -1:
                         break
-                    scores = embedding_model.predict([' '.join(p['text']), ' '.join(paragraphs[num+1]['text'])])
-                    paragraphs[num]['score'] = round(scores, 3)
+                    if use_cross_encoder:
+                        scores = embedding_model.predict([' '.join(paragraph), ' '.join(paragraphs[num+1]['text'])])
+                        paragraphs[num]['score'] = round(scores, 3)
+                    else:
+                        v1 = embedding_model.encode(' '.join(paragraph['text']))
+                        v2 = embedding_model.encode(' '.join(paragraphs[num + 1]['text']))
+                        paragraphs[num]['score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
+
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, include_score: bool=None, max_char_size: int=None,
-                          words_max: int=None, words_threshold: int=None, words_type: int=None, cross_encoder: str=None,
+                          words_max: int=None, words_threshold: int=None, words_type: int=None,
+                          use_cross_encoder: str=None, bi_encoder: str=None, cross_encoder: str=None,
                           disable_progress_bar: bool=False, save_intent: bool=None, intent_level: [int, str]=None,
                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a Table with a text column, returning the profile of that text as a list of sentences. This method
@@ -412,7 +428,9 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         :param words_max: (optional) the maximum number of words to display and score. Default is 5
         :param words_threshold: (optional) the threshold count of repeating words. Default is 1
         :param words_type: (optional) a list of word types eg. ['NOUN','PROPN','VERB','ADJ'], Default ['NOUN','PROPN']
-        :param cross_encoder: (optional) the cross encoder to use to predict the score
+        :param use_cross_encoder: (optional) if to use the cross_encoder
+        :param bi_encoder: (optional) bi encoder to use to predict the score. Defaults to "all-mpnet-base-v2"
+        :param cross_encoder: (optional) cross encoder for prediction. Default "cross-encoder/stsb-distilroberta-base"
         :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -444,8 +462,10 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
-        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN','VERB']
+        words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
         cross_encoder = cross_encoder if isinstance(cross_encoder, str) else "cross-encoder/stsb-distilroberta-base"
+        bi_encoder = bi_encoder if isinstance(bi_encoder, str) else "all-mpnet-base-v2"
+        use_cross_encoder = use_cross_encoder if isinstance(use_cross_encoder, str) else False
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         device = "cpu"
         if cuda.is_available():
@@ -480,17 +500,26 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                     })
                 if include_score:
                     # set embedding
-                    embedding_model = CrossEncoder(cross_encoder, device=device)
-                    for num, part_sent in tqdm(enumerate(sentences), disable=disable_progress_bar, total=len(sentences)-1, desc='sentence scores'):
+                    if use_cross_encoder:
+                        embedding_model = CrossEncoder(cross_encoder, device=device)
+                    else:
+                        embedding_model = SentenceTransformer(model_name_or_path=bi_encoder, device=device)
+                    for num, sentence in tqdm(enumerate(sentences), disable=disable_progress_bar, total=len(sentences)-1, desc='sentence scores'):
                         if num >= len(sentences) -1:
                             break
-                        scores = embedding_model.predict([' '.join(part_sent['text']), ' '.join(sentences[num+1]['text'])])
-                        sentences[num]['score'] = round(scores, 3)
+                        if use_cross_encoder:
+                            scores = embedding_model.predict(
+                                [' '.join(sentence['text']), sentences[num + 1]['text']])
+                            sentences[num]['score'] = round(scores, 3)
+                        else:
+                            v1 = embedding_model.encode(' '.join(sentence['text']))
+                            v2 = embedding_model.encode(sentences[num + 1]['text'])
+                            sentences[num]['score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(sentences)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None, disable_progress_bar: bool=None,
-                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                       replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None,
+                       disable_progress_bar: bool=None, save_intent: bool=None, intent_level: [int, str]=None,
+                       intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
         the sentences are joined and then chunked according to the chunk_size. However, if the temperature is used
         the sentences are grouped by temperature and then chunked. Be aware you may get small chunks for
