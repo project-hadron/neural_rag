@@ -18,9 +18,9 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 import os
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, quantize_embeddings
+from torch import cuda, backends
 import pyarrow as pa
-import torch
 
 __author__ = 'Darryl Oatridge'
 
@@ -39,14 +39,9 @@ class MilvusSourceHandler(AbstractSourceHandler):
             reference: a prefix name to reference the document vector
 
         Environment:
-            MILVUS_EMBEDDING_NAME
-            MILVUS_EMBEDDING_DEVICE
-            MILVUS_EMBEDDING_BATCH_SIZE
-            MILVUS_EMBEDDING_DIM
             MILVUS_INDEX_CLUSTERS
-            MILVUS_INDEX_SIMILARITY_TYPE
-            MILVUS_QUERY_SEARCH_LIMIT
             MILVUS_QUERY_NUM_SIMILARITY
+            MILVUS_QUERY_SEARCH_LIMIT
     """
 
     def __init__(self, connector_contract: ConnectorContract):
@@ -54,26 +49,26 @@ class MilvusSourceHandler(AbstractSourceHandler):
         # required module import
         self.pymilvus = HandlerFactory.get_module('pymilvus')
         super().__init__(connector_contract)
-        device = "cpu"
-        if torch.cuda.is_available():
-            device = "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            device = "mps"
         # reset to use dialect
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         _database = self.connector_contract.path[1:] if self.connector_contract.path[1:] else 'rai'
-        _embedding_name = os.environ.get('MILVUS_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
-        _device = os.environ.get('MILVUS_EMBEDDING_DEVICE', _kwargs.pop('device', device))
-        self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
-        self._index_type = os.environ.get('MILVUS_INDEX_SIMILARITY_TYPE', _kwargs.pop('index_type', 'L2'))
-        self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
-        self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
-        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '64')))
-        self._dimensions = int(os.environ.get('MILVUS_EMBEDDING_DIM', _kwargs.pop('dim', '768')))
         self._reference = _kwargs.pop('reference', 'general')
         self._collection_name = _kwargs.pop('collection', "default")
+        self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
+        self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
+        self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
+        # embedding name
+        use_large_model = _kwargs.pop('use_large_model', False)
+        _embedding_name = 'multi-qa-mpnet-base-cos-v1'
+        # device
+        _device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
         # embedding model
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
+        _dimensions = self._embedding_model.get_sentence_embedding_dimension()
+        # Environment hyperparams
+        self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
+        self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '10')))
+        self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
         # Start the server
         self.pymilvus.connections.connect(host=connector_contract.hostname, port=connector_contract.port)
         if _database in self.pymilvus.db.list_database():
@@ -86,8 +81,8 @@ class MilvusSourceHandler(AbstractSourceHandler):
         else:
             fields = [
                 self.pymilvus.FieldSchema(name="id", dtype=self.pymilvus.DataType.VARCHAR, auto_id=False, is_primary=True, max_length=64),
-                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=3072),
-                self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=self._dimensions)
+                self.pymilvus.FieldSchema(name="source", dtype=self.pymilvus.DataType.VARCHAR, max_length=2048),
+                self.pymilvus.FieldSchema(name="embeddings", dtype=self.pymilvus.DataType.FLOAT_VECTOR, dim=_dimensions)
             ]
             # schema
             schema = self.pymilvus.CollectionSchema(fields=fields)
@@ -99,7 +94,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
                 consistency_level='Strong')
             # index
             index_params = {
-                "metric_type": self._index_type,
+                "metric_type": 'COSINE',
                 "index_type": "IVF_FLAT",
                 "params": {"nlist": self._index_clusters}
             }
@@ -149,7 +144,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         # embedding
         query_vector = self._embedding_model.encode(query)
         # search
-        params = {"metric_type": "L2", "params": {"nprobe": self._query_similarity}}
+        params = {"metric_type": "COSINE", "params": {"nprobe": self._query_similarity}}
         results = self._collection.search(
             data = [query_vector],
             anns_field = "embeddings",
@@ -179,7 +174,7 @@ class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):
         _params = kwargs
         chunks = canonical.to_pylist()
         text_chunks = [item["text"] for item in chunks]
-        embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
+        embeddings = self._embedding_model.encode(text_chunks)
         data = [
             [f"{str(self._reference)}_{str(i)}" for i in range(len(text_chunks))],
             text_chunks,

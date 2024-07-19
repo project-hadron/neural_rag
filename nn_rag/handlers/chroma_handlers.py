@@ -17,12 +17,11 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 
 import os
 
-import torch
+from torch import cuda, backends
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
 from sentence_transformers import SentenceTransformer
 import pyarrow as pa
-
 from nn_rag.components.commons import Commons
 
 
@@ -42,11 +41,9 @@ class ChromaSourceHandler(AbstractSourceHandler):
         params:
             collection: The name of the collection
             reference: a prefix name to reference the document vector
+            use_large_model: if True but uses a large model embedder else a base embedder
 
         Environment:
-            CHROMA_EMBEDDING_NAME
-            CHROMA_EMBEDDING_DEVICE
-            CHROMA_EMBEDDING_DIM
             CHROMA_QUERY_SEARCH_LIMIT
 
     """
@@ -59,20 +56,17 @@ class ChromaSourceHandler(AbstractSourceHandler):
         # kwargs
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         self._reference = _kwargs.pop('reference', 'general')
-        device = "cpu"
-        if torch.cuda.is_available():
-            device = "cuda"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            device = "mps"
-
-        # embedding model
-        _embedding_name = os.environ.get('CHROMA_EMBEDDING_NAME', _kwargs.pop('embedding', 'all-mpnet-base-v2'))
-        _device = os.environ.get('CHROMA_EMBEDDING_DEVICE', _kwargs.pop('device', device))
-        _dimensions = int(os.environ.get('CHROMA_EMBEDDING_DIM', _kwargs.pop('dim', '384')))
+        # embedding name
+        use_large_model = _kwargs.pop('use_large_model', False)
+        _embedding_name = 'mixedbread-ai/mxbai-embed-large-v1' if use_large_model else 'all-mpnet-base-v2'
+        # set device
+        _device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
         self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '64')))
-        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device, truncate_dim=_dimensions)
+        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name,
+                                                    truncate_dim=384,
+                                                    device=_device)
         # search
-        self._search_limit = int(os.environ.get('CHROMA_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
+        self._search_limit = int(os.environ.get('CHROMA_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '10')))
         # server
         _path, _, _collection_name = self.connector_contract.path.rpartition('/')
         self._collection_name = _collection_name if (isinstance(_collection_name, str) and

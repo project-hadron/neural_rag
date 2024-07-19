@@ -130,7 +130,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful.')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_paragraphs(tbl, include_score=True, use_cross_encoder=True)
+        result = tools.text_to_paragraphs(tbl, include_score=True)
         print(kn.table_report(result, head=6).to_string())
 
     def test_text_to_paragraph_regex(self):

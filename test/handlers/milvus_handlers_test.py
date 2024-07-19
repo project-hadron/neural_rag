@@ -86,6 +86,7 @@ class MilvusTest(unittest.TestCase):
         result = kn.load_persist_canonical(query='You take a long time')
         print(result)
 
+
     def test_raise(self):
         startTime = datetime.now()
         with self.assertRaises(KeyError) as context:
