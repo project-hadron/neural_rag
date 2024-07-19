@@ -18,7 +18,8 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 import os
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
-from sentence_transformers import SentenceTransformer, quantize_embeddings
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.quantization import quantize_embeddings
 from torch import cuda, backends
 import pyarrow as pa
 
@@ -39,6 +40,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
             reference: a prefix name to reference the document vector
 
         Environment:
+            MILVUS_EMBEDDING_QUANTIZE
             MILVUS_INDEX_CLUSTERS
             MILVUS_QUERY_NUM_SIMILARITY
             MILVUS_QUERY_SEARCH_LIMIT
@@ -57,13 +59,15 @@ class MilvusSourceHandler(AbstractSourceHandler):
         self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))
         self._search_limit = int(os.environ.get('MILVUS_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '8')))
         self._query_similarity = int(os.environ.get('MILVUS_QUERY_NUM_SIMILARITY', _kwargs.pop('query_similarity', '10')))
-        # embedding name
-        use_large_model = _kwargs.pop('use_large_model', False)
-        _embedding_name = 'multi-qa-mpnet-base-cos-v1'
+        # embedding
+        _quantization = bool(os.environ.get('MILVUS_EMBEDDING_QUANTIZE', _kwargs.pop('quantize', 'False')))
+        _embedding_name = 'all-mpnet-base-v2'
         # device
         _device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
         # embedding model
         self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
+        if _quantization:
+            self._embedding_model = quantize_embeddings(self._embedding_model, precision="binary")
         _dimensions = self._embedding_model.get_sentence_embedding_dimension()
         # Environment hyperparams
         self._index_clusters = int(os.environ.get('MILVUS_INDEX_CLUSTERS', _kwargs.pop('index_clusters', '128')))

@@ -349,7 +349,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         sep = self._extract_value(sep)
         sep = sep if isinstance(sep, str) else '\n\n'
         max_char_size = max_char_size if isinstance(max_char_size, int) else 900_000
-        bi_encoder = "multi-qa-mpnet-base-dot-v1"
+        bi_encoder = "multi-qa-mpnet-base-cos-v1"
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         # set device
         device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
@@ -405,7 +405,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                         break
                     v1 = embedding_model.encode(' '.join(paragraph['text']))
                     v2 = embedding_model.encode(' '.join(paragraphs[num + 1]['text']))
-                    paragraphs[num]['score'] = round(util.dot_score(v1, v2)[0, 0].tolist(), 3)
+                    paragraphs[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
         return pa.Table.from_pylist(paragraphs)
 
     def text_to_sentences(self, canonical: pa.Table, include_score: bool=None, max_char_size: int=None,
@@ -454,8 +454,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         words_max = words_max if isinstance(words_max, int) else 4
         words_threshold = words_threshold if isinstance(words_threshold, int) else 1
         words_type = words_type if isinstance(words_type, list) else ['NOUN','PROPN']
-        bi_encoder = ("multi-qa-mpnet-base-dot-v1"
-                      "")
+        bi_encoder = "multi-qa-mpnet-base-cos-v1"
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
         # set device
         device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"

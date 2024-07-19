@@ -21,6 +21,7 @@ from torch import cuda, backends
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
 from sentence_transformers import SentenceTransformer
+from sentence_transformers.quantization import quantize_embeddings
 import pyarrow as pa
 from nn_rag.components.commons import Commons
 
@@ -41,9 +42,9 @@ class ChromaSourceHandler(AbstractSourceHandler):
         params:
             collection: The name of the collection
             reference: a prefix name to reference the document vector
-            use_large_model: if True but uses a large model embedder else a base embedder
 
         Environment:
+            CHROMA_EMBEDDING_QUANTIZE
             CHROMA_QUERY_SEARCH_LIMIT
 
     """
@@ -56,15 +57,14 @@ class ChromaSourceHandler(AbstractSourceHandler):
         # kwargs
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         self._reference = _kwargs.pop('reference', 'general')
-        # embedding name
-        use_large_model = _kwargs.pop('use_large_model', False)
-        _embedding_name = 'mixedbread-ai/mxbai-embed-large-v1' if use_large_model else 'all-mpnet-base-v2'
+        # embedding
+        _quantization = bool(os.environ.get('CHROMA_EMBEDDING_QUANTIZE', _kwargs.pop('quantize', 'False')))
+        _embedding_name = 'all-mpnet-base-v2'
         # set device
         _device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
-        self._batch_size = int(os.environ.get('MILVUS_EMBEDDING_BATCH_SIZE', _kwargs.pop('batch_size', '64')))
-        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name,
-                                                    truncate_dim=384,
-                                                    device=_device)
+        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
+        if _quantization:
+            self._embedding_model = quantize_embeddings(self._embedding_model, precision="binary")
         # search
         self._search_limit = int(os.environ.get('CHROMA_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '10')))
         # server
