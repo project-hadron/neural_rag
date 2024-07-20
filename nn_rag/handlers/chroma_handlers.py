@@ -21,7 +21,6 @@ from torch import cuda, backends
 from ds_core.handlers.abstract_handlers import AbstractSourceHandler, ConnectorContract
 from ds_core.handlers.abstract_handlers import HandlerFactory, AbstractPersistHandler
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.quantization import quantize_embeddings
 import pyarrow as pa
 from nn_rag.components.commons import Commons
 
@@ -44,7 +43,6 @@ class ChromaSourceHandler(AbstractSourceHandler):
             reference: a prefix name to reference the document vector
 
         Environment:
-            CHROMA_EMBEDDING_QUANTIZE
             CHROMA_QUERY_SEARCH_LIMIT
 
     """
@@ -58,13 +56,10 @@ class ChromaSourceHandler(AbstractSourceHandler):
         _kwargs = {**self.connector_contract.kwargs, **self.connector_contract.query}
         self._reference = _kwargs.pop('reference', 'general')
         # embedding
-        _quantization = bool(os.environ.get('CHROMA_EMBEDDING_QUANTIZE', _kwargs.pop('quantize', 'False')))
         _embedding_name = 'all-mpnet-base-v2'
         # set device
         _device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
-        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, device=_device)
-        if _quantization:
-            self._embedding_model = quantize_embeddings(self._embedding_model, precision="binary")
+        self._embedding_model = SentenceTransformer(model_name_or_path=_embedding_name, truncate_dim=384, device=_device)
         # search
         self._search_limit = int(os.environ.get('CHROMA_QUERY_SEARCH_LIMIT', _kwargs.pop('search_limit', '10')))
         # server
@@ -135,7 +130,7 @@ class ChromaPersistHandler(ChromaSourceHandler, AbstractPersistHandler):
         _params = kwargs
         chunks = canonical.to_pylist()
         text_chunks = [item["text"] for item in chunks]
-        embeddings = self._embedding_model.encode(text_chunks, batch_size=self._batch_size)
+        embeddings = self._embedding_model.encode(text_chunks)
 
         self._collection.upsert(
             ids=[f"{str(self._reference)}_{str(i)}" for i in range(len(text_chunks))],
