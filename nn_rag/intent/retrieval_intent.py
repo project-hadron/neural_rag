@@ -17,10 +17,9 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 import inspect
 
 from sentence_transformers import CrossEncoder
+from nn_rag.intent.abstract_retrieval_intent import AbstractRetrievalIntentModel
 
-from nn_rag.intent.abstract_agent_intent import AbstractAgentIntentModel
-
-class AgentIntent(AbstractAgentIntentModel):
+class RetrievalIntent(AbstractRetrievalIntentModel):
 
     def simple_query(self, query: str, connector_name: str=None, limit: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
               replace_intent: bool=None, remove_duplicates: bool=None):

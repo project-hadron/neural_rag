@@ -18,7 +18,7 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 from ds_core.properties.abstract_properties import AbstractPropertyManager
 
 
-class AgentPropertyManager(AbstractPropertyManager):
+class RetrievalPropertyManager(AbstractPropertyManager):
 
     def __init__(self, task_name: str, creator: str):
         """initialises the property manager.

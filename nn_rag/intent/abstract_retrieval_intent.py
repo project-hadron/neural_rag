@@ -21,14 +21,14 @@ from pyarrow.lib import ArrowNotImplementedError
 from ds_core.intent.abstract_intent import AbstractIntentModel
 from nn_rag.components.commons import Commons
 from ds_core.handlers.abstract_handlers import ConnectorContract
-from nn_rag.managers.agent_property_manager import AgentPropertyManager
+from nn_rag.managers.retrieval_property_manager import RetrievalPropertyManager
 
-class AbstractAgentIntentModel(AbstractIntentModel):
+class AbstractRetrievalIntentModel(AbstractIntentModel):
 
     _INTENT_PARAMS = ['self', 'save_intent', 'intent_level', 'intent_order',
                       'replace_intent', 'remove_duplicates']
 
-    def __init__(self, property_manager: AgentPropertyManager, default_save_intent: bool=None,
+    def __init__(self, property_manager: RetrievalPropertyManager, default_save_intent: bool=None,
                  default_intent_level: [str, int, float]=None, order_next_available: bool=None,
                  default_replace_intent: bool=None):
         """initialisation of the Intent class.

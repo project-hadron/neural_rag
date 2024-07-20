@@ -16,12 +16,12 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 """
 
 from __future__ import annotations
-from nn_rag.intent.agent_intent import AgentIntent
-from nn_rag.managers.agent_property_manager import AgentPropertyManager
+from nn_rag.intent.retrieval_intent import RetrievalIntent
+from nn_rag.managers.retrieval_property_manager import RetrievalPropertyManager
 from nn_rag.components.abstract_common_component import AbstractCommonComponent
 
 
-class Knowledge(AbstractCommonComponent):
+class Retrieval(AbstractCommonComponent):
 
     @classmethod
     def from_uri(cls, task_name: str, uri_pm_path: str, creator: str, uri_pm_repo: str=None, pm_file_type: str=None,
@@ -29,7 +29,7 @@ class Knowledge(AbstractCommonComponent):
                  reset_templates: bool=None, template_path: str=None, template_module: str=None,
                  template_source_handler: str=None, template_persist_handler: str=None, align_connectors: bool=None,
                  default_save_intent: bool=None, default_intent_level: bool=None, order_next_available: bool=None,
-                 default_replace_intent: bool=None, has_contract: bool=None) -> Knowledge:
+                 default_replace_intent: bool=None, has_contract: bool=None) -> Retrieval:
         """ Class Factory Method to instantiates the component's application. The Factory Method handles the
         instantiation of the Properties Manager, the Intent Model and the persistence of the uploaded properties.
         See class inline _docs for an example method
@@ -60,8 +60,8 @@ class Knowledge(AbstractCommonComponent):
         pm_file_type = pm_file_type if isinstance(pm_file_type, str) else 'parquet'
         pm_module = pm_module if isinstance(pm_module, str) else cls.HADRON_PM_MODULE
         pm_handler = pm_handler if isinstance(pm_handler, str) else cls.HADRON_PM_HANDLER
-        _pm = AgentPropertyManager(task_name=task_name, creator=creator)
-        _intent_model = AgentIntent(property_manager=_pm, default_save_intent=default_save_intent,
+        _pm = RetrievalPropertyManager(task_name=task_name, creator=creator)
+        _intent_model = RetrievalIntent(property_manager=_pm, default_save_intent=default_save_intent,
                                              default_intent_level=default_intent_level,
                                              order_next_available=order_next_available,
                                              default_replace_intent=default_replace_intent)
@@ -74,10 +74,10 @@ class Knowledge(AbstractCommonComponent):
                    align_connectors=align_connectors)
 
     @property
-    def pm(self) -> AgentPropertyManager:
+    def pm(self) -> RetrievalPropertyManager:
         return self._component_pm
 
     @property
-    def tools(self) -> AgentIntent:
+    def tools(self) -> RetrievalIntent:
         return self._intent_model
 
