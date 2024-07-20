@@ -498,22 +498,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)
         return pa.Table.from_pylist(result)
 
-        # for item in tqdm(text, total=len(text), disable=disable_progress_bar, desc='chunks stats'):
-        #     while len(item) > 0:
-        #         text_chunk = item[:char_chunk_size + overlap]
-        #         item = item[char_chunk_size:]
-        #         chunk_dict = {}
-        #         # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
-        #         joined_text_chunk = "".join(text_chunk).replace("  ", " ").strip()
-        #         joined_text_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_text_chunk)  # ".A" -> ". A" for any full-stop/capital letter combo
-        #         # Get stats about the chunk
-        #         chunk_dict["char_count"] = len(joined_text_chunk)
-        #         chunk_dict["word_count"] = len([word for word in joined_text_chunk.split(" ")])
-        #         chunk_dict["token_count"] = len(joined_text_chunk) / 4  # 1 token = ~4 characters
-        #         chunk_dict["text"] = joined_text_chunk
-        #         chunks.append(chunk_dict)
-        # return pa.Table.from_pylist(chunks)
-
     #  ---------
     #   Private
     #  ---------
