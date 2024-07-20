@@ -60,6 +60,15 @@ class KnowledgeIntentTest(unittest.TestCase):
         except OSError:
             pass
 
+    def test_replace_on_pattern(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = "First line.\nSecond line.\r\nThird line.\rFourth line.\n\nParagraph break."
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.replace_on_pattern(tbl)
+        print(kn.table_report(result).to_string())
+
     def test_filter_on_join_indicies(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools

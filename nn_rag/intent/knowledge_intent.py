@@ -153,19 +153,29 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return pa.Table.from_pylist(result)
         return canonical
 
-    def filter_replace_str(self, canonical: pa.Table, pattern: str, replacement: str, is_regex: bool=None,
+    def replace_on_pattern(self, canonical: pa.Table, pattern: [str, list]=None, replacement: str=None,
                            max_replacements: int=None, save_intent: bool=None, intent_level: [int, str]=None,
                            intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
-        """ For each string in 'text', replace non-overlapping substrings that match the given literal pattern
-        with the given replacement. If max_replacements is given and not equal to -1, it limits the maximum
-        amount replacements per input, counted from the left. Null values emit null.
+        """ given as pattern or list of patterns, uses regular expression to find and replace in the text.
+        If max_replacements is given and not equal to -1, it limits the maximum amount replacements per input,
+        counted from the left. Null values emit null.
 
         If is a regex then RE2 Regular Expression Syntax is used
 
+        By default, the following end of lines are used
+        ```python
+            eol_characters = [
+                '\n',    # Unix/Linux/MacOS newline
+                '\r\n',  # Windows newline
+                '\r',    # Old MacOS newline
+                '\n\n',   # Double newline, sometimes used for paragraph breaks
+                ' {2,}'  # two or more spaces
+            ]
+        ```
+
         :param canonical: a pa.Table as the reference table
-        :param pattern: Substring pattern to look for inside input values.
+        :param pattern: Substring pattern or list to look for inside input values.
         :param replacement: What to replace the pattern with.
-        :param is_regex: (optional) if the pattern is a regex. Default False
         :param max_replacements: (optional) The maximum number of strings to replace in each input value.
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
@@ -185,16 +195,20 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                                    intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
+        eol_characters = [
+            '\n\n',  # Double newline, sometimes used for paragraph breaks
+            '\n',  # Unix/Linux/MacOS newline
+            '\r\n',  # Windows newline
+            '\r',  # Old MacOS newline
+        ]
         canonical = self._get_canonical(canonical)
-        is_regex = is_regex if isinstance(is_regex, bool) else False
-        c = canonical.column('text').combine_chunks()
-        if is_regex:
-            rtn_values = pc.replace_substring_regex(c, pattern, replacement, max_replacements=max_replacements)
-        else:
-            rtn_values = pc.replace_substring(c, pattern, replacement, max_replacements=max_replacements)
-        canonical = Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
-        # reset the index
-        return canonical.drop('index').add_column(0, 'index', [list(range(canonical.num_rows))])
+        pattern = Commons.list_formatter(pattern)
+        pattern = pattern if pattern else eol_characters
+        pattern = '|'.join(map(re.escape, pattern))
+        replacement = replacement if isinstance(replacement, str) else ' '
+        text = canonical.column('text')
+        rtn_values = pc.replace_substring_regex(text, pattern, replacement, max_replacements=max_replacements)
+        return Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
 
     def filter_on_join(self, canonical: pa.Table, indices: list=None, chunk_size: int=None, include_score: bool=None, 
                        disable_progress_bar: bool=None, save_intent: bool=None, intent_level: [int, str]=None,
