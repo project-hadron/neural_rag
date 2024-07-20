@@ -77,12 +77,20 @@ class KnowledgeIntentTest(unittest.TestCase):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
         text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question.'
-                'You did not understand my needs.I have been mis-sold. My details are not accurate.')
+                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
+                'You did not understand my needs. I have been mis-sold. My details are not accurate. You have asked '
+                'for too much information. You were not helpful. Payment not generated/received by customer. You did '
+                'not keep me updated. Incorrect information given. The performance of my product was poor. No reply '
+                'to customer contact. Requested documentation not issued. You did not explain the terms & conditions. '
+                'Policy amendments not carried out. You did not explain the next steps/process to me. I cannot '
+                'understand your letter/comms. Standard letter inappropriate. Customer payment processed incorrectly. '
+                'All points not addressed. Could not understand the agent. Issue with terms and conditions. Misleading '
+                'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_sentences(tbl)
         result = tools.filter_on_join(result, indices=[], chunk_size=100)
+        print(pc.max(result['text']))
         print(kn.table_report(result).to_string())
 
     def test_filter_on_mask_index(self):
@@ -188,7 +196,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         tbl = pa.table([arr], names=['text'])
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
-        result =  tools.text_to_sentences(tbl, max_char_size=100)
+        result =  tools.text_to_sentences(tbl, char_limit=10)
         print(kn.table_report(result, head=5).to_string())
 
     def test_text_to_sentence_score(self):
@@ -244,18 +252,17 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        sentences = tools.text_to_sentences(tbl)
-        result = tools.text_to_chunks(sentences, char_chunk_size=100)
+        result = tools.text_to_chunks(tbl, char_chunk_size=100)
         print(kn.table_report(result).to_string())
 
-    def test_text_from_load(self):
-        kn = Knowledge.from_memory()
-        tools: KnowledgeIntent = kn.tools
-        uri = '../../jupyter/knowledge/hadron/source/Global-Index-1st-Edition-Report.pdf'
-        kn.set_source_uri(uri)
-        tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=True)
-        result = tbl.filter(pc.greater(tbl['table_count'], 0))
-        print(result.shape)
+    # def test_text_from_load(self):
+    #     kn = Knowledge.from_memory()
+    #     tools: KnowledgeIntent = kn.tools
+    #     uri = '../../jupyter/knowledge/hadron/source/Global-Index-1st-Edition-Report.pdf'
+    #     kn.set_source_uri(uri)
+    #     tbl = kn.load_source_canonical(file_type='pdf', as_pages=True, as_markdown=True)
+    #     result = tbl.filter(pc.greater(tbl['table_count'], 0))
+    #     print(result.shape)
 
     def test_raise(self):
         startTime = datetime.now()
