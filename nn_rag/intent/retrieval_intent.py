@@ -15,18 +15,24 @@ You will find a copy of this licenseIn the root directory of the project
 or you can visit <https://www.gnu.org/licenses/> For further information.
 """
 import inspect
-
+import pyarrow as pa
+import pyarrow.compute as pc
 from sentence_transformers import CrossEncoder
+
+from nn_rag.components.commons import Commons
 from nn_rag.intent.abstract_retrieval_intent import AbstractRetrievalIntentModel
+from torch import cuda, backends
+
 
 class RetrievalIntent(AbstractRetrievalIntentModel):
 
-    def simple_query(self, query: str, connector_name: str=None, limit: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-              replace_intent: bool=None, remove_duplicates: bool=None):
-        """ takes chunks from a Table and converts them to a pyarrow tensor of embeddings.
+    CONNECTOR_SOURCE = 'primary_source'
 
-         :param query: bool text query to run against the list of tensor embeddings
-         :param connector_name: a connector name where the question will be applied
+    def query_similarity(self, query: str, limit: int=None, save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                         replace_intent: bool=None, remove_duplicates: bool=None):
+        """
+
+         :param query: text query to run against the list of tensor embeddings
          :param limit: (optional) the number of items to return from the results of the query
          :param save_intent: (optional) if the intent contract should be saved to the property manager
          :param intent_level: (optional) the intent name that groups intent to create a column
@@ -47,19 +53,18 @@ class RetrievalIntent(AbstractRetrievalIntentModel):
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
         # remove intent params
         query = self._extract_value(query)
-        limit = limit if isinstance(limit, int) else 5
-        if self._pm.has_connector(connector_name):
-            handler = self._pm.get_connector_handler(connector_name)
+        limit = limit if isinstance(limit, int) else 10
+        if self._pm.has_connector(self.CONNECTOR_SOURCE):
+            handler = self._pm.get_connector_handler(self.CONNECTOR_SOURCE)
             return handler.load_canonical(query=query, limit=limit)
-        raise ValueError(f"The connector name {connector_name} has been given but no Connect Contract added")
+        raise ValueError(f"The source connector has been set")
 
-    def reranker__query(self, query: str, connector_name: str=None, bi_limit: int=None, cross_limit: int=None,
-                        save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                        replace_intent: bool=None, remove_duplicates: bool=None):
-        """ takes chunks from a Table and converts them to a pyarrow tensor of embeddings.
+    def query_reranker(self, query: str, bi_limit: int=None, cross_limit: int=None,
+                       save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                       replace_intent: bool=None, remove_duplicates: bool=None):
+        """
 
          :param query: bool text query to run against the list of tensor embeddings
-         :param connector_name: a connector name where the question will be applied
          :param bi_limit: (optional) bi encoder limits for results of the query
          :param cross_limit: (optional) cross encoder limits for results of the query
          :param save_intent: (optional) if the intent contract should be saved to the property manager
@@ -83,15 +88,12 @@ class RetrievalIntent(AbstractRetrievalIntentModel):
         query = self._extract_value(query)
         bi_limit = bi_limit if isinstance(bi_limit, int) else 20
         cross_limit = cross_limit if isinstance(cross_limit, int) else 5
-        if self._pm.has_connector(connector_name):
-            handler = self._pm.get_connector_handler(connector_name)
-            result = handler.load_canonical(query=query, limit=bi_limit)
-
-            # cross encoder
-            model = CrossEncoder("cross-encoder/stsb-roberta-base", device='cpu')
-            sentence_pairs = [[query, s] for s in result['source']]
-            ce_scores = model.predict(sentence_pairs)
-
-
-        raise ValueError(f"The connector name {connector_name} has been given but no Connect Contract added")
-
+        device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
+        bi_answer = self.query_similarity(query=query, limit=bi_limit)
+        # cross encoder
+        model = CrossEncoder("cross-encoder/stsb-roberta-base", device=device)
+        sentence_pairs = [[query, s] for s in bi_answer['source'].to_pylist()]
+        ce_scores = model.predict(sentence_pairs)
+        tbl = Commons.table_append(bi_answer, pa.table([pa.array(ce_scores, pa.float32())], names=["cross-encoder_score"]))
+        sorted_indices = pc.sort_indices(tbl, sort_keys=[("cross-encoder_score", "descending")])
+        return tbl.take(sorted_indices).slice(0, 5)

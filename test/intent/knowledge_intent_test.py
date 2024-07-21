@@ -98,7 +98,7 @@ class KnowledgeIntentTest(unittest.TestCase):
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         result = tools.text_to_sentences(tbl)
-        result = tools.filter_on_join(result, indices=[], chunk_size=100)
+        result = tools.filter_on_join(result, chunk_size=100)
         print(pc.max(result['text']))
         print(kn.table_report(result).to_string())
 
