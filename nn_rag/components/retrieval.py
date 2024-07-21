@@ -81,3 +81,16 @@ class Retrieval(AbstractCommonComponent):
     def tools(self) -> RetrievalIntent:
         return self._intent_model
 
+    def remove_embedding(self, connector_name: str=None, **kwargs):
+        """removes all embedding from a vector database. If the connector name is not provided
+        the connector_name will default to the CONNECTOR_PERSIST constant.
+
+        :param connector_name: the name or label to identify and reference the connector
+        :param kwargs: arguments to be passed to the handler on remove
+        """
+        connector_name = connector_name if isinstance(connector_name, str) else self.CONNECTOR_SOURCE
+        if self.pm.has_connector(connector_name):
+            handler = self.pm.get_connector_handler(connector_name)
+            handler.remove_collection(**kwargs)
+            return
+        raise ConnectionError("The connector name {} was not found.".format(connector_name))
