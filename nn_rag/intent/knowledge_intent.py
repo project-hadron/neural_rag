@@ -393,7 +393,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             section = []
             doc = nlp(item)
-            for section in tqdm(doc.sents, disable=disable_progress_bar, total=sum(1 for _ in doc.sents), desc='Build paragraphs'):
+            for section in doc.sents:
                 section = str(section.text).replace(' |', ' ').replace('\n', ' ').strip()
                 text_parts.append(str(section))
         text = text_parts
@@ -451,7 +451,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         for item in text:
             section = []
             doc = nlp(item)
-            for section in tqdm(doc.sents, disable=disable_progress_bar, total=sum(1 for _ in doc.sents), desc='Build sentences'):
+            for section in doc.sents:
                 text_parts.append(str(section))
         text = text_parts
         if isinstance(char_limit, int):
@@ -493,7 +493,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
 
         def split_strings(strings, chunk_length, overlap_length):
             rtn_list = []
-            for string in strings:
+            for string in tqdm(strings, disable=disable_progress_bar, total=len(strings), desc='building chunks'):
                 i = 0
                 while i < len(string):
                     start = max(0,i) if i == 0 else  max(0, i - overlap_length)
@@ -554,7 +554,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         if include_score:
             # set embedding
             embedding_model = SentenceTransformer(model_name_or_path=bi_encoder, device=device)
-            for num, part in tqdm(enumerate(result), disable=disable_progress_bar, total=len(result)-1, desc='Calculate scores'):
+            for num, part in tqdm(enumerate(result), disable=disable_progress_bar, total=len(result)-1, desc='Calculating scores'):
                 if num >= len(result) -1:
                     break
                 v1 = embedding_model.encode(' '.join(part['text']))
