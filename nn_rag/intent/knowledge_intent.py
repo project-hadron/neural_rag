@@ -459,7 +459,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)
         return pa.Table.from_pylist(result)
 
-    def text_to_chunks(self, canonical: pa.Table, char_chunk_size: int=None, overlap: int=None, include_score: bool=None,
+    def text_to_chunks(self, canonical: pa.Table, chunk_size: int=None, overlap: int=None, include_score: bool=None,
                        disable_progress_bar: bool=None, save_intent: bool=None, intent_level: [int, str]=None,
                        intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ Taking a profile Table and converts the sentences into chunks ready for embedding. By default,
@@ -468,7 +468,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         small sentences.
 
         :param canonical: a pa.Table as the reference table
-        :param char_chunk_size: (optional) The number of characters per chunk. Default is 500
+        :param chunk_size: (optional) The number of characters per chunk. Default is 500
         :param overlap: (optional) the number of chars a chunk should overlap. Note this adds to the size of the chunk
         :param include_score: (optional) if the score should be included. This helps with speed. Default is True
         :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
@@ -503,12 +503,12 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return rtn_list
 
         canonical = self._get_canonical(canonical)
-        char_chunk_size = self._extract_value(char_chunk_size)
-        char_chunk_size = char_chunk_size if isinstance(char_chunk_size, int) else 512
+        chunk_size = self._extract_value(chunk_size)
+        chunk_size = chunk_size if isinstance(chunk_size, int) else 512
         overlap = self._extract_value(overlap)
-        overlap = overlap if isinstance(overlap, int) else int(char_chunk_size / 10)
+        overlap = overlap if isinstance(overlap, int) else int(chunk_size / 10)
         text = canonical.column('text').to_pylist()
-        text = split_strings(text, char_chunk_size-overlap, overlap)
+        text = split_strings(text, chunk_size - overlap, overlap)
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)
         return pa.Table.from_pylist(result)
 

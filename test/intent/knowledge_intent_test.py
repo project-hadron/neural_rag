@@ -261,7 +261,7 @@ class KnowledgeIntentTest(unittest.TestCase):
                 'information. I can not use the customer portal. your customer portal is unhelpful')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
-        result = tools.text_to_chunks(tbl, char_chunk_size=100)
+        result = tools.text_to_chunks(tbl, chunk_size=100)
         print(kn.table_report(result).to_string())
 
     # def test_text_from_load(self):
