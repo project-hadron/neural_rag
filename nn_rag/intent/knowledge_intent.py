@@ -22,7 +22,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
 from markdown import Markdown
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import SentenceTransformer, util, CrossEncoder
 from spacy.language import Language
 from torch import cuda, backends
 from nn_rag.components.commons import Commons
@@ -588,9 +588,6 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         """ Builds the statistical view of a list of text"""
         include_score = include_score if isinstance(include_score, bool) else False
         disable_progress_bar = disable_progress_bar if isinstance(disable_progress_bar, str) else False
-        bi_encoder = "multi-qa-mpnet-base-cos-v1"
-        # set device
-        device = "cuda" if cuda.is_available() else "mps" if hasattr(backends, "mps") and backends.mps.is_available() else "cpu"
         # if text is too large spacy will fail
         result = []
         for num, section in enumerate(text):
@@ -605,14 +602,15 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
                 'text': section,
             })
         if include_score:
-            # set embedding
-            embedding_model = SentenceTransformer(model_name_or_path=bi_encoder, device=device)
-            for num, part in tqdm(enumerate(result), disable=disable_progress_bar, total=len(result)-1, desc='Calculating scores'):
-                if num >= len(result) -1:
-                    break
-                v1 = embedding_model.encode(' '.join(part['text']))
-                v2 = embedding_model.encode(' '.join(result[num + 1]['text']))
-                result[num]['score'] = round(util.cos_sim(v1, v2)[0, 0].tolist(), 3)
+            device = "cuda" if cuda.is_available() else "mps" if hasattr(backends,"mps") and backends.mps.is_available() else "cpu"
+            text_list = [item['text'] for item in result]
+            l1 = text_list[:-1]
+            l2 = text_list[1:]
+            model = CrossEncoder("cross-encoder/stsb-roberta-base", device=device)
+            sentence_pairs = [[l1, l2] for l1, l2 in zip(l1, l2)]
+            ce_scores = model.predict(sentence_pairs)
+            for i, value in enumerate(ce_scores + [0]):
+                result[i]['score'] = round(value, 3)
         return result
 
     def _template(self, canonical: pa.Table,

@@ -240,15 +240,14 @@ These are the elements outlined in John Gruber’s original design document.
     def test_text_to_sentence_score(self):
         kn = Knowledge.from_env('tester', has_contract=False)
         tools: KnowledgeIntent = kn.tools
-        text = ('You took too long. You are not easy to deal with. Payment Failure/Incorrect Payment. You provided '
-                'me with incorrect information. Unhappy with delay. Unsuitable advice. You never answered my question. '
-                'You did not understand my needs. I have been mis-sold.')
+        text = ('You took too long. You took too long. You were slow. You are not easy to deal with.'
+                'You were hard work. I did not get what I asked for. The product was wrong.')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         # uri = "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf"
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
         result =  tools.text_to_sentences(tbl, include_score=True)
-        print(kn.table_report(result, head=5).to_string())
+        print(kn.table_report(result).to_string())
 
 
     def test_text_to_chunks(self):
