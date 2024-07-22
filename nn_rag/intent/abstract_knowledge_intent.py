@@ -114,10 +114,6 @@ class AbstractKnowledgeIntentModel(AbstractIntentModel):
         mask_null = mask_null if isinstance(mask_null, bool) else False
         if isinstance(condition, tuple):
             condition = [condition]
-        is_cat = False
-        if pa.types.is_dictionary(column.type):
-            column = column.dictionary_decode()
-            is_cat = True
         cond_list = []
         for (comparison, operator, logic) in condition:
             try:

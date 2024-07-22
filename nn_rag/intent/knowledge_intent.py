@@ -89,7 +89,7 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         header = self._extract_value(header)
         h_col = canonical.column(header).combine_chunks()
         mask = self._extract_mask(h_col, condition=condition, mask_null=mask_null)
-        canonical = canonical.filter(mask)
+        canonical = canonical.filter(pc.invert(mask))
         # Convert the text and rebuild
         text = canonical['text'].to_pylist()
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)

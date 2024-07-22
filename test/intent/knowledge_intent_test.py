@@ -69,6 +69,17 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.replace_on_pattern(tbl)
         print(kn.table_report(result).to_string())
 
+    def test_filter_on_condition(self):
+        kn = Knowledge.from_env('tester', has_contract=False)
+        tools: KnowledgeIntent = kn.tools
+        text = 'You. Me. This is a sentence. An. Another one here. And some more to try.'
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result =  tools.text_to_sentences(tbl, include_score=True)
+        print(kn.table_report(result).to_string())
+        result = tools.filter_on_condition(result, header='char_count', condition=(5, 'less', None))
+        print(kn.table_report(result).to_string())
+
     def test_filter_on_join_indicies(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
@@ -248,7 +259,6 @@ These are the elements outlined in John Gruber’s original design document.
         # tbl = kn.set_source_uri(uri, file_type='pdf').load_source_canonical()
         result =  tools.text_to_sentences(tbl, include_score=True)
         print(kn.table_report(result).to_string())
-
 
     def test_text_to_chunks(self):
         kn = Knowledge.from_memory()
