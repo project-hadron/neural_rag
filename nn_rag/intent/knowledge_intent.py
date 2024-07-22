@@ -16,10 +16,12 @@ or you can visit <https://www.gnu.org/licenses/> For further information.
 """
 
 import inspect
+from io import StringIO
 import re
 import pyarrow as pa
 import pyarrow.compute as pc
 import spacy
+from markdown import Markdown
 from sentence_transformers import SentenceTransformer, util
 from spacy.language import Language
 from torch import cuda, backends
@@ -32,7 +34,14 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
     """This class represents RAG intent actions whereby data preparation can be done
     """
 
-    def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None, 
+    EOL_CHARACTERS = [
+        '\n\n',  # Double newline, sometimes used for paragraph breaks
+        '\n',  # Unix/Linux/MacOS newline
+        '\r\n',  # Windows newline
+        '\r',  # Old MacOS newline
+    ]
+
+    def filter_on_condition(self, canonical: pa.Table, header: str, condition: list, mask_null: bool=None,
                             include_score: bool=None, disable_progress_bar: bool=None, save_intent: bool=None, 
                             intent_order: int=None, intent_level: [int, str]=None, replace_intent: bool=None, 
                             remove_duplicates: bool=None) -> pa.Table:
@@ -153,30 +162,23 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             return pa.Table.from_pylist(result)
         return canonical
 
-    def replace_on_pattern(self, canonical: pa.Table, pattern: [str, list]=None, replacement: str=None,
-                           max_replacements: int=None, save_intent: bool=None, intent_level: [int, str]=None,
-                           intent_order: int=None, replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def replace_on_pattern(self, canonical: pa.Table, pattern: str=None, replacement: str=None,
+                           max_replacements: int=None, include_score: bool=None, disable_progress_bar: bool=None,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """ given as pattern or list of patterns, uses regular expression to find and replace in the text.
         If max_replacements is given and not equal to -1, it limits the maximum amount replacements per input,
         counted from the left. Null values emit null.
 
-        If is a regex then RE2 Regular Expression Syntax is used
-
-        By default, the following end of lines are used
-        ```python
-            eol_characters = [
-                '\n',    # Unix/Linux/MacOS newline
-                '\r\n',  # Windows newline
-                '\r',    # Old MacOS newline
-                '\n\n',   # Double newline, sometimes used for paragraph breaks
-                ' {2,}'  # two or more spaces
-            ]
-        ```
+        If no pattern is given, the default behavior is to tidy the text by removing end of line characters
+        and removing superfluous spaces.
 
         :param canonical: a pa.Table as the reference table
-        :param pattern: Substring pattern or list to look for inside input values.
-        :param replacement: What to replace the pattern with.
+        :param pattern: (optional) RE2 Regular Expression pattern.
+        :param replacement: (optional) replace the pattern with.
         :param max_replacements: (optional) The maximum number of strings to replace in each input value.
+        :param include_score: (optional) if the score should be calculated. This helps with speed. Default is True
+        :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
         :param save_intent: (optional) if the intent contract should be saved to the property manager
         :param intent_level: (optional) the intent name that groups intent to create a column
         :param intent_order: (optional) the order in which each intent should run.
@@ -194,21 +196,20 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
                                    intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
                                    remove_duplicates=remove_duplicates, save_intent=save_intent)
-        # remove intent params
-        eol_characters = [
-            '\n\n',  # Double newline, sometimes used for paragraph breaks
-            '\n',  # Unix/Linux/MacOS newline
-            '\r\n',  # Windows newline
-            '\r',  # Old MacOS newline
-        ]
+        # code block
         canonical = self._get_canonical(canonical)
-        pattern = Commons.list_formatter(pattern)
-        pattern = pattern if pattern else eol_characters
-        pattern = '|'.join(map(re.escape, pattern))
-        replacement = replacement if isinstance(replacement, str) else ' '
         text = canonical.column('text')
-        rtn_values = pc.replace_substring_regex(text, pattern, replacement, max_replacements=max_replacements)
-        return Commons.table_append(canonical, pa.table([rtn_values], names=['text']))
+        if isinstance(pattern, str):
+            # make the list an 'or' pattern
+            replacement = replacement if isinstance(replacement, str) else ' '
+            new_text = pc.replace_substring_regex(text, pattern, replacement, max_replacements=max_replacements)
+        else:
+            # default behaviour
+            eol_pattern = '|'.join(map(re.escape, self.EOL_CHARACTERS))
+            eol_text = pc.replace_substring_regex(text, eol_pattern, ' ')
+            new_text = pc.replace_substring_regex(eol_text, '\s{2,}', ' ')
+        result = self._build_statistics(new_text.to_pylist(), include_score=include_score, disable_progress_bar=disable_progress_bar)
+        return pa.Table.from_pylist(result)
 
     def filter_on_join(self, canonical: pa.Table, indices: list=None, chunk_size: int=None, include_score: bool=None, 
                        disable_progress_bar: bool=None, save_intent: bool=None, intent_level: [int, str]=None,
@@ -284,7 +285,59 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)
         return pa.Table.from_pylist(result)
 
-    def text_to_document(self, canonical: pa.Table, sep: str=None, save_intent: bool=None, 
+    def text_from_markdown(self, canonical: pa.Table, include_score: bool=None, disable_progress_bar: bool=None,
+                           save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                           replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """ a Markdown text and converts it to a plain text string
+
+        :param canonical: a pa.Table as the reference table
+        :param include_score: (optional) if the score should be calculated. This helps with speed. Default is True
+        :param disable_progress_bar: (optional) turn the progress bar off and on. Default is False
+        :param save_intent: (optional) if the intent contract should be saved to the property manager
+        :param intent_level: (optional) the intent name that groups intent to create a column
+        :param intent_order: (optional) the order in which each intent should run.
+                    - If None: default's to -1
+                    - if -1: added to a level above any current instance of the intent section, level 0 if not found
+                    - if int: added to the level specified, overwriting any that already exist
+
+        :param replace_intent: (optional) if the intent method exists at the level, or default level
+                    - True - replaces the current intent method with the new
+                    - False - leaves it untouched, disregarding the new intent
+
+        :param remove_duplicates: (optional) removes any duplicate intent in any level that is identical
+        """
+        # intent recipie options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # code block
+
+        def unmark_element(element, stream=None):
+            if stream is None:
+                stream = StringIO()
+            if element.text:
+                stream.write(element.text)
+            for sub in element:
+                unmark_element(sub, stream)
+            if element.tail:
+                stream.write(element.tail)
+            return stream.getvalue()
+
+        # patching Markdown
+        Markdown.output_formats["plain"] = unmark_element
+        _md = Markdown(output_format="plain")
+        _md.stripTopLevelTags = False
+
+        canonical = self._get_canonical(canonical)
+        text = canonical.column('text').to_pylist()
+        eol_pattern = '|'.join(map(re.escape, self.EOL_CHARACTERS))
+        plain_text = []
+        for item in text:
+            plain_text.append(_md.convert(item))
+        result = self._build_statistics(plain_text, include_score=include_score, disable_progress_bar=disable_progress_bar)
+        return pa.Table.from_pylist(result)
+
+    def text_to_document(self, canonical: pa.Table, sep: str=None, save_intent: bool=None,
                          intent_level: [int, str]=None, intent_order: int=None, replace_intent: bool=None, 
                          remove_duplicates: bool=None) -> pa.Table:
         """ Takes a table and joins all the row text into a single row.

@@ -128,6 +128,35 @@ class KnowledgeIntentTest(unittest.TestCase):
         result = tools.filter_on_mask(result, pattern='^You.*(You|Unhappy)')
         print(kn.table_report(result).to_string())
 
+    def test_text_from_markdown(self):
+        kn = Knowledge.from_memory()
+        tools: KnowledgeIntent = kn.tools
+        text = """
+# Markdown Cheat Sheet
+This Markdown cheat sheet provides a quick overview of all the Markdown syntax elements. 
+
+## Basic Syntax
+These are the elements outlined in John Gruber’s original design document.
+
+### Heading
+# H1
+## H2
+### H3
+
+**bold text**
+
+*italicized text*
+               
+### Ordered List
+1. First item
+2. Second item
+3. Third item
+        """
+        arr = pa.array([text], pa.string())
+        tbl = pa.table([arr], names=['text'])
+        result = tools.text_from_markdown(tbl)
+        print(kn.table_report(result, head=6).to_string())
+
     def test_text_to_paragraph(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools

@@ -1,17 +1,17 @@
 ###### Requirements without Version Specifiers ######
-setuptools~=69.5.1
-pyarrow~=16.1.0
-matplotlib
-numpy~=1.26.4
-pandas~=2.2.2
-Requests~=2.31.0
+setuptools
+pyarrow
+numpy
+pandas
+requests
 PyMuPDF
 pymupdf4llm
 sentence_transformers
-spacy~=3.7.2
+spacy
 transformers
 accelerate
 bitsandbytes
 wheel
 torch
 tqdm
+markdown
