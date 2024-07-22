@@ -603,14 +603,11 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
             })
         if include_score:
             device = "cuda" if cuda.is_available() else "mps" if hasattr(backends,"mps") and backends.mps.is_available() else "cpu"
-            text_list = [item['text'] for item in result]
-            l1 = text_list[:-1]
-            l2 = text_list[1:]
             model = CrossEncoder("cross-encoder/stsb-roberta-base", device=device)
-            sentence_pairs = [[l1, l2] for l1, l2 in zip(l1, l2)]
-            ce_scores = model.predict(sentence_pairs)
-            for i, value in enumerate(ce_scores + [0]):
-                result[i]['score'] = round(value, 3)
+            text_list = [item['text'] for item in result[1:]]
+            for idx, item in tqdm(enumerate(result[:-1]), disable=disable_progress_bar, total=len(result)-1):
+                value = model.predict([item['text'], text_list[idx]])
+                result[idx]['score'] = round(value, 3)
         return result
 
     def _template(self, canonical: pa.Table,
