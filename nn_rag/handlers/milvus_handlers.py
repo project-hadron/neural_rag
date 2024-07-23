@@ -156,7 +156,7 @@ class MilvusSourceHandler(AbstractSourceHandler):
         ids = pa.array(results[0].ids, pa.string())
         distances = pa.array(results[0].distances, pa.float32())
         entities = pa.array([x.entity.to_dict()['entity']['source'] for x in results[0]], pa.string())
-        return pa.table([ids, distances, entities], names=['id', 'distance', 'source'])
+        return pa.table([ids, distances, entities], names=['id', 'distance', 'text'])
 
 
 class MilvusPersistHandler(MilvusSourceHandler, AbstractPersistHandler):

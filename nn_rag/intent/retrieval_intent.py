@@ -92,8 +92,8 @@ class RetrievalIntent(AbstractRetrievalIntentModel):
         bi_answer = self.query_similarity(query=query, limit=bi_limit)
         # cross encoder
         model = CrossEncoder("cross-encoder/stsb-roberta-base", device=device)
-        sentence_pairs = [[query, s] for s in bi_answer['source'].to_pylist()]
+        sentence_pairs = [[query, s] for s in bi_answer['text'].to_pylist()]
         ce_scores = model.predict(sentence_pairs)
-        tbl = Commons.table_append(bi_answer, pa.table([pa.array(ce_scores, pa.float32())], names=["cross-encoder_score"]))
-        sorted_indices = pc.sort_indices(tbl, sort_keys=[("cross-encoder_score", "descending")])
+        tbl = Commons.table_append(bi_answer, pa.table([pa.array(ce_scores, pa.float32()), bi_answer['text']], names=["score", "text"]))
+        sorted_indices = pc.sort_indices(tbl, sort_keys=[("score", "descending")])
         return tbl.take(sorted_indices).slice(0, 5)

@@ -114,7 +114,7 @@ class ChromaSourceHandler(AbstractSourceHandler):
         ids = pa.array(results.get('ids')[0], pa.string())
         distances = pa.array(results.get('distances')[0], pa.float32())
         entities = pa.array(results.get('documents')[0], pa.string())
-        return pa.table([ids, distances, entities], names=['id', 'distance', 'source'])
+        return pa.table([ids, distances, entities], names=['id', 'distance', 'text'])
 
 class ChromaPersistHandler(ChromaSourceHandler, AbstractPersistHandler):
     # a Chroma persist handler
