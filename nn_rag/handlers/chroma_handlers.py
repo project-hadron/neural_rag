@@ -70,7 +70,7 @@ class ChromaSourceHandler(AbstractSourceHandler):
             self._client = self.chroma.HttpClient(host=self.connector_contract.hostname,
                                                   port=self.connector_contract.port)
         elif _path:
-            self._client = self.chroma.PersistentClient(path=_path)
+            self._client = self.chroma.PersistentClient(path=_path[1:])
         else:
             self._client = self.chroma.Client()
         self._collection = self._client.get_or_create_collection(name=self._collection_name)
