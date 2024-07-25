@@ -84,13 +84,10 @@ class ChromaSourceHandler(AbstractSourceHandler):
         return True
 
     def has_changed(self) -> bool:
-        """ if the table has changed. Only works with certain implementations"""
-        return self._changed_flag
+        return True
 
     def reset_changed(self, changed: bool = False):
-        """ manual reset to say the table has been seen. This is automatically called if the file is loaded"""
-        changed = changed if isinstance(changed, bool) else False
-        self._changed_flag = changed
+        pass
 
     def load_canonical(self, query: [str, list], expr: dict=None, limit: int=None, **kwargs) -> pa.Table:
         """ returns the canonical dataset based on a vector similarity search

@@ -97,3 +97,17 @@ class RetrievalIntent(AbstractRetrievalIntentModel):
         tbl = Commons.table_append(bi_answer, pa.table([pa.array(ce_scores, pa.float32()), bi_answer['text']], names=["score", "text"]))
         sorted_indices = pc.sort_indices(tbl, sort_keys=[("score", "descending")])
         return tbl.take(sorted_indices).slice(0, 5)
+
+    #  ---------
+    #   Private
+    #  ---------
+
+    def _template(self,
+                  save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                  replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+        """"""
+        # intent recipie options
+        self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
+                                   intent_level=intent_level, intent_order=intent_order, replace_intent=replace_intent,
+                                   remove_duplicates=remove_duplicates, save_intent=save_intent)
+        # code block
