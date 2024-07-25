@@ -12,8 +12,8 @@ from ds_core.properties.property_manager import PropertyManager
 from ds_capability import *
 from ds_capability.components.commons import Commons
 
-from nn_rag import Knowledge, Retrieval
-from nn_rag.intent.retrieval_intent import RetrievalIntent
+from nn_rag import Knowledge, Generator
+from nn_rag.intent.generator_intent import GeneratorIntent
 
 # Pandas setup
 pd.set_option('max_colwidth', 320)
@@ -22,7 +22,7 @@ pd.set_option('display.max_columns', 99)
 pd.set_option('expand_frame_repr', True)
 
 
-class RetrievalTest(unittest.TestCase):
+class GeneratorTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -65,16 +65,16 @@ class RetrievalTest(unittest.TestCase):
 
     def test_simple_query(self):
         set_kb()
-        rag = Retrieval.from_memory()
-        tools: RetrievalIntent = rag.tools
+        rag = Generator.from_memory()
+        tools: GeneratorIntent = rag.tools
         rag.set_source_uri(uri="chroma:///")
         result = tools.query_similarity('you took ages')
         print(rag.table_report(result, head=5).to_string())
 
     def test_reranker_query(self):
         set_kb()
-        rag = Retrieval.from_memory()
-        tools: RetrievalIntent = rag.tools
+        rag = Generator.from_memory()
+        tools: GeneratorIntent = rag.tools
         rag.set_source_uri(uri="chroma:///")
         result = tools.query_reranker('you took ages')
         print(rag.table_report(result).to_string())
