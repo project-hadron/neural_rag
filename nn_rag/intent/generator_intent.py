@@ -175,7 +175,7 @@ class GeneratorIntent(AbstractGeneratorIntentModel):
         question = pa.array([query], pa.string())
         context = pa.array([' '.join(context_items)], pa.string())
         answer = pa.array([output_text], pa.string())
-        return pa.Table([question, context, answer], names=['question', 'context', 'answer'])
+        return pa.table([question, context, answer], names=['question', 'context', 'answer'])
 
     #  ---------
     #   Private
