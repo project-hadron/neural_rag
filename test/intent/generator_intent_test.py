@@ -63,6 +63,16 @@ class GeneratorTest(unittest.TestCase):
         except OSError:
             pass
 
+    def test_model_answer(self):
+        set_kb()
+        rag = Generator.from_memory()
+        tools: GeneratorIntent = rag.tools
+        rag.set_source_uri(uri="chroma:///")
+        tools.model_instantiate('google/gemma-2b-it')
+        query = 'You take a long time?'
+        result = tools.model_answer(query)
+        print(rag.table_report(result, headers='context', drop=True).to_string())
+
     def test_simple_query(self):
         set_kb()
         rag = Generator.from_memory()

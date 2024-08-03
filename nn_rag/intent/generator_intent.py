@@ -133,9 +133,9 @@ class GeneratorIntent(AbstractGeneratorIntentModel):
         )
         return pa.table([])
 
-    def model_run(self, query, temperature=None, max_new_tokens=None, format_answer_text=None,
-                  save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
-                  replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
+    def model_answer(self, query, temperature=None, max_new_tokens=None, format_answer_text=None,
+                     save_intent: bool=None, intent_level: [int, str]=None, intent_order: int=None,
+                     replace_intent: bool=None, remove_duplicates: bool=None) -> pa.Table:
         """"""
         # intent recipie options
         self._set_intend_signature(self._intent_builder(method=inspect.currentframe().f_code.co_name, params=locals()),
@@ -181,7 +181,7 @@ class GeneratorIntent(AbstractGeneratorIntentModel):
     #   Private
     #  ---------
 
-    def _build_prompt(self, query: str, context_items: list[dict], ) -> str:
+    def _build_prompt(self, query: str, context_items: list[dict]) -> str:
         """"""
         # Join context items into one dotted paragraph
         context = "- " + "\n- ".join([item for item in context_items])
@@ -192,7 +192,6 @@ class GeneratorIntent(AbstractGeneratorIntentModel):
             "Don't return the thinking, only return the answer. Make sure your answers are as explanatory as possible. "
             "Now use the following context items to answer the user query:"
             "\n{context}"
-            "\nRelevant passages: <extract relevant passages from the context here>"
             "\nUser query: {query}"
             "\nAnswer:")
         # Update base prompt with context items and query
