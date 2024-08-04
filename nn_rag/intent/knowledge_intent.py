@@ -425,31 +425,28 @@ class KnowledgeIntent(AbstractKnowledgeIntentModel):
         if isinstance(pattern, str):
             prep_text = []
             for chunk in text:
-                sub_text = []
                 parts = re.split(pattern, chunk)
                 matches = re.findall(pattern, chunk)
                 elements = [parts[0].strip()] if parts[0] else []
                 for i in range(len(matches)):
                     elements.append(str(matches[i] + parts[i + 1]).strip())
-                sub_text += elements
-                sub_text = ' | '.join(sub_text)
-                prep_text.append(sub_text)
+                prep_text += elements
             text = prep_text
         else:
             text = [chunk.replace(sep, ' | ') for chunk in text]
-        # if text is too large spacy will fail
-        text = self._limit_elements(text, 999_990)
-        # load English parser
-        nlp = spacy.load("en_core_web_sm")
-        nlp.add_pipe("set_custom_paragraph", before="parser")
-        text_parts = []
-        for item in text:
-            section = []
-            doc = nlp(item)
-            for section in doc.sents:
-                section = str(section.text).replace(' |', ' ').replace('\n', ' ').strip()
-                text_parts.append(str(section))
-        text = text_parts
+            # if text is too large spacy will fail
+            text = self._limit_elements(text, 999_990)
+            # load English parser
+            nlp = spacy.load("en_core_web_sm")
+            nlp.add_pipe("set_custom_paragraph", before="parser")
+            text_parts = []
+            for item in text:
+                section = []
+                doc = nlp(item)
+                for section in doc.sents:
+                    section = str(section.text).replace(' |', ' ').replace('\n', ' ').strip()
+                    text_parts.append(str(section))
+            text = text_parts
         result = self._build_statistics(text, include_score=include_score, disable_progress_bar=disable_progress_bar)
         return pa.Table.from_pylist(result)
 

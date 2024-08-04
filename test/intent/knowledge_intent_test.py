@@ -193,13 +193,16 @@ These are the elements outlined in John Gruber’s original design document.
     def test_text_to_paragraph_regex(self):
         kn = Knowledge.from_memory()
         tools: KnowledgeIntent = kn.tools
-        # uri = "https://assets.circle.so/kvx4ix1f5ctctk55daheobna46hf"
-        # tbl = kn.set_source_uri(uri).load_source_canonical()
-        text = ('You took too long. (1) You are not easy to deal with.\n\nPayment Failure/Incorrect Payment.')
+        text = ('Badguys AI Ethics and Responsible AI Policy At Badguys, This policy outlines our '
+                'commitment to ethical AI practices:\n1. Ethical Principles:\na. Transparency: We '
+                'commit to transparency in our AI systems design,\nb. Fairness and Equity: We will '
+                'ensure that our AI technologies do not propagate bias\n2. Data Governance:\na. Data '
+                'Quality:\nb. User Consent:\n3. AI Development and Deployment: a. Continuous '
+                'Evaluation:\nb. Human Oversight: ')
         arr = pa.array([text], pa.string())
         tbl = pa.table([arr], names=['text'])
         # result = tools.text_to_paragraphs(tbl, pattern='\n')
-        result = tools.text_to_paragraphs(tbl, pattern='\(.*?\)')
+        result = tools.text_to_paragraphs(tbl, pattern=r"\d+\.\s[A-Z]")
         # result = tools.text_to_paragraphs(tbl)
         print(kn.table_report(result).to_string())
 
